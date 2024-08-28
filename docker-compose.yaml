@@ -1,0 +1,85 @@
+
+services:
+  pgadmin4:
+    image: elestio/pgadmin:REL-8_7
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_ADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_ADMIN_PASSWORD}
+      PGADMIN_LISTEN_PORT: ${PGADMIN_INTERNAL_PORT}
+    ports:
+      - ${PGADMIN_EXTERNAL_PORT}:${PGADMIN_INTERNAL_PORT}
+    volumes:
+      - ${PGADMIN_SERVERS_VOLUME}:/pgadmin4/servers.json
+    depends_on:
+      - airflow-postgres-ct
+
+  airflow-postgres-ct:
+    image: postgres:16.2
+    environment:
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
+    ports:
+      - ${AIRFLOW_POSTGRES_EXTERNAL_PORT}:${AIRFLOW_POSTGRES_INTERNAL_PORT}
+    volumes:
+      - ${AIRFLOW_POSTGRES_DATA_VOLUME}:/var/lib/postgresql/data/
+    restart: always
+
+  airflow-webserver:
+    build: 
+      dockerfile: Dockerfile
+    depends_on:
+      - airflow-postgres-ct
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
+      - TZ=Asia/Ho_Chi_Minh
+      - AIRFLOW_USER_USERNAME=${AIRFLOW_USER_USERNAME}
+      - AIRFLOW_USER_PASSWORD=${AIRFLOW_USER_PASSWORD}
+      - AIRFLOW_USER_FIRSTNAME=${AIRFLOW_USER_FIRSTNAME}
+      - AIRFLOW_USER_LASTNAME=${AIRFLOW_USER_LASTNAME}
+      - AIRFLOW_USER_ROLE=${AIRFLOW_USER_ROLE}
+      - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
+    ports:
+      - ${AIRFLOW_WEBSERVER_EXTERNAL_PORT}:${AIRFLOW_WEBSERVER_INTERNAL_PORT}
+    volumes:
+      - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
+      - ${AIRFLOW_POSTGRES_METADB_VOLUME}:/opt/airflow/calibre/metadata.db
+    command: ["airflow", "webserver"]
+    restart: always
+
+  airflow-scheduler:
+    build: 
+      dockerfile: Dockerfile
+    depends_on:
+      - airflow-postgres-ct
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
+      - TZ=Asia/Ho_Chi_Minh
+      - AIRFLOW_USER_USERNAME=${AIRFLOW_USER_USERNAME}
+      - AIRFLOW_USER_PASSWORD=${AIRFLOW_USER_PASSWORD}
+      - AIRFLOW_USER_FIRSTNAME=${AIRFLOW_USER_FIRSTNAME}
+      - AIRFLOW_USER_LASTNAME=${AIRFLOW_USER_LASTNAME}
+      - AIRFLOW_USER_ROLE=${AIRFLOW_USER_ROLE}
+      - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
+    volumes:
+      - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
+    command: ["airflow", "scheduler"]
+    restart: always
+    
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - DOCKER_MODS=linuxserver/mods:universal-calibre 
+      - OAUTHLIB_RELAX_TOKEN_SCOPE=1 
+    volumes:
+      - ${CALIBRE_CONFIG_VOLUME}:/config/
+      - ${CALIBRE_LIBRARY_VOLUME}:/books/
+    ports:
+      - 8083:8083
+    restart: unless-stopped
+
+
