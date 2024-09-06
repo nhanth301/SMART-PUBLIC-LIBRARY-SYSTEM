@@ -6,7 +6,7 @@ function is_db_initialized() {
     echo "Database is already initialized."
     return 0
   else
-    return 1
+    return 1 
   fi
 }
 

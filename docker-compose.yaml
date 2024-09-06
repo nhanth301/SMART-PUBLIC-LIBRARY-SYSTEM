@@ -79,7 +79,7 @@ services:
       - ${CALIBRE_CONFIG_VOLUME}:/config/
       - ${CALIBRE_LIBRARY_VOLUME}:/books/
     ports:
-      - 8083:8083
+      - ${CALIBRE_EXTERNAL_PORT}:${CALIBRE_INTERNAL_PORT}
     restart: unless-stopped
 
 
