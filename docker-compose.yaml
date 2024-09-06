@@ -80,6 +80,6 @@ services:
       - ${CALIBRE_LIBRARY_VOLUME}:/books/
     ports:
       - ${CALIBRE_EXTERNAL_PORT}:${CALIBRE_INTERNAL_PORT}
-    restart: unless-stopped
+    restart: always
 
 
