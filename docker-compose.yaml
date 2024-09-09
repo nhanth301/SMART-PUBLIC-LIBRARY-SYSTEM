@@ -1,5 +1,22 @@
 
 services:
+  postgres-ct:
+    image: ankane/pgvector
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - ${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}
+    volumes:
+      - ${POSTGRES_DATA_VOLUME}:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
   pgadmin4:
     image: elestio/pgadmin:REL-8_7
     restart: always
@@ -13,6 +30,7 @@ services:
       - ${PGADMIN_SERVERS_VOLUME}:/pgadmin4/servers.json
     depends_on:
       - airflow-postgres-ct
+      - postgres-ct
 
   airflow-postgres-ct:
     image: postgres:16.2
@@ -31,6 +49,7 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - airflow-postgres-ct
+      - postgres-ct
     environment:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
       - TZ=Asia/Ho_Chi_Minh
@@ -40,11 +59,13 @@ services:
       - AIRFLOW_USER_LASTNAME=${AIRFLOW_USER_LASTNAME}
       - AIRFLOW_USER_ROLE=${AIRFLOW_USER_ROLE}
       - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
+      - AIRFLOW__SCHEDULER__LOCAL_TASK_JOB_HEARTBEAT_SEC=600
     ports:
       - ${AIRFLOW_WEBSERVER_EXTERNAL_PORT}:${AIRFLOW_WEBSERVER_INTERNAL_PORT}
     volumes:
       - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
-      - ${AIRFLOW_POSTGRES_METADB_VOLUME}:/opt/airflow/calibre/metadata.db
+      - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
     command: ["airflow", "webserver"]
     restart: always
 
@@ -53,6 +74,7 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - airflow-postgres-ct
+      - postgres-ct
     environment:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
       - TZ=Asia/Ho_Chi_Minh
@@ -62,8 +84,11 @@ services:
       - AIRFLOW_USER_LASTNAME=${AIRFLOW_USER_LASTNAME}
       - AIRFLOW_USER_ROLE=${AIRFLOW_USER_ROLE}
       - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
+      - AIRFLOW__SCHEDULER__LOCAL_TASK_JOB_HEARTBEAT_SEC=600
     volumes:
       - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
+      - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
     command: ["airflow", "scheduler"]
     restart: always
     
@@ -81,5 +106,6 @@ services:
     ports:
       - ${CALIBRE_EXTERNAL_PORT}:${CALIBRE_INTERNAL_PORT}
     restart: always
+  
 
 
