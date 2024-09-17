@@ -6,7 +6,6 @@ import re
 import sqlite3
 import psycopg2
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.util import cos_sim
 
 
 SQLITE_DB_PATH = '/opt/airflow/calibre/metadata.db'
@@ -15,6 +14,12 @@ PG_USER = 'admin'
 PG_PASS = 'admin'
 PG_HOST = 'postgres-ct'
 PG_PORT = '5432'
+
+model = SentenceTransformer(
+    "jinaai/jina-embeddings-v2-base-en",
+    trust_remote_code=True
+    )
+model.max_seq_length = 1024
 
 sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
 pg_conn = psycopg2.connect(
@@ -125,23 +130,49 @@ def extract_books_tags(**kwargs):
     finally:
         cursor.close()
 
+def filter(table_name, source_ids, dbpmk=False):
+    if dbpmk:
+        try:
+            pg_cursor = pg_conn.cursor()
+            query = f"SELECT * from public.{table_name}"
+            pg_cursor.execute(query)
+            rows = pg_cursor.fetchall()
+            dest_ids = set(rows)
+        finally:
+            pg_cursor.close()
+        deleted_ids = dest_ids - source_ids
+        new_ids = source_ids - dest_ids
+        return new_ids, deleted_ids
+    else:
+        try:
+            pg_cursor = pg_conn.cursor()
+            query = f"SELECT id from public.{table_name}"
+            pg_cursor.execute(query)
+            rows = pg_cursor.fetchall()
+            dest_ids = set([row[0] for row in rows])
+        finally:
+            pg_cursor.close()
+        deleted_ids = dest_ids - source_ids
+        new_ids = source_ids - dest_ids
+        return new_ids, deleted_ids
+
+
 def transform_books(**kwargs):
-    model = SentenceTransformer(
-    "jinaai/jina-embeddings-v2-base-en",
-    trust_remote_code=True
-    )
-    model.max_seq_length = 1024
     ti = kwargs['ti']
     data = ti.xcom_pull(task_ids='extract_books',key='book_data')
+    source_ids = set([d["id"]for d in data])
+    new_ids, deleted_ids = filter('books',source_ids)
     transformed_data = []
     for e in data:
-        e['summary'] = clean_description(extract_description(e['summary']))
-        if e['summary'] != "NaN":  
-            e['summary_embed'] = model.encode([e['summary']])[0].astype(float).tolist()
-        else:
-            e['summary_embed'] = [0.0] * 768
-        e['title_embed'] = model.encode([e['title']])[0].astype(float).tolist()
-        transformed_data.append(e)
+        if e['id'] in new_ids:
+            e['summary'] = clean_description(extract_description(e['summary']))
+            if e['summary'] != "NaN":  
+                e['summary_embed'] = model.encode([e['summary']])[0].astype(float).tolist()
+            else:
+                e['summary_embed'] = [0.0] * 768
+            e['title_embed'] = model.encode([e['title']])[0].astype(float).tolist()
+            transformed_data.append(e)
+    ti.xcom_push(key='deleted_ids',value=deleted_ids)
     ti.xcom_push(key='transformed_data',value=transformed_data)
 
 def load_books(**kwargs):
@@ -178,6 +209,9 @@ def load_books(**kwargs):
                 item['title_embed'],
                 item['summary_embed']
             ))
+        deleted_ids = ti.xcom_pull(task_ids='transform_books',key='deleted_ids')
+        if len(deleted_ids) > 0:
+            pg_cursor.execute("DELETE FROM books WHERE id IN %s",(tuple(deleted_ids),))
         
         pg_conn.commit()
     finally:
@@ -186,6 +220,8 @@ def load_books(**kwargs):
 def load_tags(**kwargs):
     ti = kwargs['ti']
     rows = ti.xcom_pull(task_ids='extract_tags',key='tag_data')
+    source_ids = set([row[0] for row in rows])
+    new_ids, deleted_ids = filter('tags',source_ids)
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
@@ -195,7 +231,10 @@ def load_tags(**kwargs):
         SET name = EXCLUDED.name;
         '''
         for row in rows:
-            pg_cursor.execute(insert_query, (row[0],row[1]))
+            if row[0] in new_ids:
+                pg_cursor.execute(insert_query, (row[0],row[1]))
+        if len(deleted_ids) > 0:
+            pg_cursor.execute("DELETE FROM tags WHERE id IN %s",(tuple(deleted_ids),))
         pg_conn.commit()
     finally:
         pg_cursor.close()
@@ -222,7 +261,7 @@ def load_books_tags(**kwargs):
 default_args = {
     'owner': 'airflow',
     'start_date': datetime(2024, 9, 8),
-    'execution_timeout': timedelta(minutes=10),  # Tăng thời gian timeout
+    'execution_timeout': timedelta(minutes=10),  
 }
 
 # Define the DAG
@@ -290,7 +329,7 @@ close_conn_task = PythonOperator(
     dag=dag
 )
 
-check_conn_task >> [extract_books_task, extract_tags_task, extract_books_tags_task]
+check_conn_task >> [extract_books_task, extract_tags_task, extract_books_tags_task] 
 extract_books_task >> transform_books_task >> load_books_task
 extract_tags_task >> load_tags_task
 extract_books_tags_task >> load_books_tags_task
