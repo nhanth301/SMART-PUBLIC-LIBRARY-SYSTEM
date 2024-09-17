@@ -264,7 +264,7 @@ dag = DAG(
     'ETL',
     default_args=default_args,
     description='ETL Process',
-    schedule_interval='@daily',
+    schedule_interval=None,
 )
 
 # Define the task
