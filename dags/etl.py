@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 import re
 import sqlite3
 import psycopg2
-from sentence_transformers import SentenceTransformer
+import requests
 
 
 SQLITE_DB_PATH = '/opt/airflow/calibre/metadata.db'
@@ -15,11 +15,6 @@ PG_PASS = 'admin'
 PG_HOST = 'postgres-ct'
 PG_PORT = '5432'
 
-model = SentenceTransformer(
-    "jinaai/jina-embeddings-v2-base-en",
-    trust_remote_code=True
-    )
-model.max_seq_length = 1024
 
 sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
 pg_conn = psycopg2.connect(
@@ -167,10 +162,10 @@ def transform_books(**kwargs):
         if e['id'] in new_ids:
             e['summary'] = clean_description(extract_description(e['summary']))
             if e['summary'] != "NaN":  
-                e['summary_embed'] = model.encode([e['summary']])[0].astype(float).tolist()
+                e['summary_embed'] = requests.post('https://zep.hcmute.fit/7561/transform', json={'texts': [e['summary']]}).json()['embeddings'][0]
             else:
                 e['summary_embed'] = [0.0] * 768
-            e['title_embed'] = model.encode([e['title']])[0].astype(float).tolist()
+            e['title_embed'] = requests.post('https://zep.hcmute.fit/7561/transform', json={'texts': [e['title']]}).json()['embeddings'][0]
             transformed_data.append(e)
     ti.xcom_push(key='deleted_ids',value=deleted_ids)
     ti.xcom_push(key='transformed_data',value=transformed_data)
