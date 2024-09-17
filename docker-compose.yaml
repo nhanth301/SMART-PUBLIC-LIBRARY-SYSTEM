@@ -107,5 +107,13 @@ services:
       - ${CALIBRE_EXTERNAL_PORT}:${CALIBRE_INTERNAL_PORT}
     restart: always
   
+  
+  flask-web-library:
+    build: 
+      dockerfile: flask-web-library/Dockerfile
+    ports:
+      - 1111:1111
+    depends_on:
+      - postgres-ct
 
 
