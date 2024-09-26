@@ -1,13 +1,14 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+from airflow.providers.postgres.operators.postgres import PostgresOperator
 import xml.etree.ElementTree as ET
 import re
 import sqlite3
 import psycopg2
 import requests
 
-
+HOST = "https://zep.hcmute.fit/7561"
 SQLITE_DB_PATH = '/opt/airflow/calibre/metadata.db'
 PG_DB = 'spls'
 PG_USER = 'admin'
@@ -162,10 +163,13 @@ def transform_books(**kwargs):
         if e['id'] in new_ids:
             e['summary'] = clean_description(extract_description(e['summary']))
             if e['summary'] != "NaN":  
-                e['summary_embed'] = requests.post('https://zep.hcmute.fit/7561/transform', json={'texts': [e['summary']]}).json()['embeddings'][0]
+                e['summary_embed'] = requests.post(f'{HOST}/transform', json={'texts': [e['summary']]}).json()['embeddings'][0]
             else:
                 e['summary_embed'] = [0.0] * 768
-            e['title_embed'] = requests.post('https://zep.hcmute.fit/7561/transform', json={'texts': [e['title']]}).json()['embeddings'][0]
+            e['title_embed'] = requests.post(f'{HOST}/transform', json={'texts': [e['title']]}).json()['embeddings'][0]
+            with open(e['image'], 'rb') as img:
+                files = {'image': img}
+                e['img_embed']= requests.post(f'{HOST}/extract_img', files=files).json()['last_hidden_state'][0][0]
             transformed_data.append(e)
     ti.xcom_push(key='deleted_ids',value=deleted_ids)
     ti.xcom_push(key='transformed_data',value=transformed_data)
@@ -176,8 +180,8 @@ def load_books(**kwargs):
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
-        INSERT INTO public.books (id, title, summary, image, author, created_date, published_date, modified_date, title_embed, summary_embed)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO public.books (id, title, summary, image, author, created_date, published_date, modified_date, title_embed, summary_embed, img_embed)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO UPDATE
         SET title = EXCLUDED.title,
             summary = EXCLUDED.summary,
@@ -187,7 +191,8 @@ def load_books(**kwargs):
             published_date = EXCLUDED.published_date,
             modified_date = EXCLUDED.modified_date,
             title_embed = EXCLUDED.title_embed,
-            summary_embed = EXCLUDED.summary_embed
+            summary_embed = EXCLUDED.summary_embed,
+            img_embed = EXCLUDED.img_embed
             ;
         '''
         
@@ -202,7 +207,8 @@ def load_books(**kwargs):
                 item['published_date'],
                 item['modified_date'],
                 item['title_embed'],
-                item['summary_embed']
+                item['summary_embed'],
+                item['img_embed']
             ))
         deleted_ids = ti.xcom_pull(task_ids='transform_books',key='deleted_ids')
         if len(deleted_ids) > 0:
@@ -300,6 +306,63 @@ transform_books_task = PythonOperator(
     dag=dag
 )
 
+create_books_table = PostgresOperator(
+    task_id = 'create_books_table',
+    sql="""
+    DO $$
+    BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+        CREATE EXTENSION vector;
+    END IF;
+    END $$;
+    CREATE TABLE IF NOT EXISTS public.books
+    (
+        id integer NOT NULL,
+        title character varying COLLATE pg_catalog."default" NOT NULL,
+        summary character varying COLLATE pg_catalog."default" NOT NULL,
+        image character varying COLLATE pg_catalog."default" NOT NULL,
+        author character varying COLLATE pg_catalog."default" NOT NULL,
+        published_date timestamp with time zone NOT NULL,
+        created_date timestamp with time zone NOT NULL,
+        modified_date timestamp with time zone NOT NULL,
+        title_embed vector(768),
+        summary_embed vector(768),
+        img_embed vector(768),
+        CONSTRAINT books_pkey PRIMARY KEY (id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.books OWNER to admin;
+    """
+)
+
+create_tags_table = PostgresOperator(
+    task_id = 'create_tags_table',
+    sql="""
+    CREATE TABLE IF NOT EXISTS public.books_tags
+    (
+        book_id integer NOT NULL,
+        tag_id integer NOT NULL,
+        CONSTRAINT books_tags_pkey PRIMARY KEY (book_id, tag_id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.books_tags OWNER to admin;
+    """
+)
+
+create_books_tags_table = PostgresOperator(
+    task_id = 'create_books_tags_table',
+    sql="""
+    CREATE TABLE IF NOT EXISTS public.tags
+    (
+        id integer NOT NULL,
+        name character varying NOT NULL,
+        CONSTRAINT tags_pkey PRIMARY KEY (id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.tags OWNER to admin;
+    """
+)
+
 load_books_task = PythonOperator(
     task_id='load_books',
     python_callable=load_books,
@@ -325,7 +388,7 @@ close_conn_task = PythonOperator(
 )
 
 check_conn_task >> [extract_books_task, extract_tags_task, extract_books_tags_task] 
-extract_books_task >> transform_books_task >> load_books_task
-extract_tags_task >> load_tags_task
-extract_books_tags_task >> load_books_tags_task
+extract_books_task >> create_books_table >> transform_books_task >> load_books_task
+extract_tags_task >> create_tags_table   >> load_tags_task
+extract_books_tags_task >> create_books_tags_table >> load_books_tags_task
 [load_books_task, load_tags_task, load_books_tags_task] >> close_conn_task
