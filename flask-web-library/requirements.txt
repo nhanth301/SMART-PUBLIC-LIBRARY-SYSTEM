@@ -1,1 +1,9 @@
 flask
+psycopg2-binary
+sqlalchemy
+numpy
+django
+djangorestframework
+pgvector
+requests
+django-cors-headers

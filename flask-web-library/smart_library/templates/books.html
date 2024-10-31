@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+    <title>Danh Sách Sách</title>
+</head>
+<body>
+    <h1>Danh Sách Sách</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Published Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in books %}
+            <tr>
+                <td>{{ book.id }}</td>
+                <td>{{ book.title }}</td>
+                <td>{{ book.author }}</td>
+                <td>{{ book.published_date }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <a href="/">Trở về Trang Chủ</a>
+
+    <!-- Nút Chatbot luôn xuất hiện bên phải -->
+    <div id="chatbot-panel">
+        <div id="chatbot-header">
+            <h3>Chatbot</h3>
+            <button id="close-chatbot" onclick="closeChatbot()">X</button>
+        </div>
+        <div id="chatbot-body">
+            <div id="chatbot-response"></div>
+        </div>
+        <div id="chatbot-footer">
+            <textarea id="user-input" placeholder="Nhập câu hỏi của bạn..." oninput="adjustInputHeight(this)"></textarea>
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+    <button id="chatbot-toggle-btn" onclick="openChatbot()">Chat với chúng tôi!</button>
+
+    <script src="{% static 'js/chatbot.js' %}"></script> 
+</body>
+</html>

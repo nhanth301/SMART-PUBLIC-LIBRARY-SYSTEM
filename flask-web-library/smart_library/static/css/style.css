@@ -1,0 +1,29 @@
+
+
+a.navbar-brand{
+    padding: 15px;
+}
+
+input.form-control{
+    padding: 5 10 5 10;
+}
+
+.btn{
+    padding: 5 10 5 10;
+}
+
+.navbar-collapse a{
+    padding:15px;
+}
+
+
+.input-group {
+    width: 300px; 
+}
+
+.navbar {
+    display: flex; 
+    align-items: center; 
+    justify-content: normal !important;
+}
+

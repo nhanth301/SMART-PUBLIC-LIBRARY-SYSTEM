@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ book.title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .book-image {
+            max-width: 100%;
+            height: auto;
+        }
+        .book-details {
+            margin-top: 20px;
+        }
+        .book-details h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .book-details p {
+            margin: 8px 0;
+        }
+        .book-meta {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="book-details">
+            <h1>{{ book.title }}</h1>
+            <p class="book-meta">Tác giả: {{ book.author }}</p>
+            <p class="book-meta">Ngày xuất bản: {{ book.published_date|date:"d M Y" }}</p>
+            
+            {% if book.image %}
+            <img src="{{ book.image }}" alt="Book cover" class="book-image">
+            {% else %}
+            <p><em>No cover image available.</em></p>
+            {% endif %}
+
+            <h2>Tóm tắt</h2>
+            <p>{{ book.summary|default:"No summary available" }}</p>
+        </div>
+    </div>
+</body>
+</html>

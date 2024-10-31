@@ -1,0 +1,84 @@
+/* Nút chatbot cố định bên phải */
+#chatbot-toggle-btn {
+    position: fixed;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 10px 20px;
+    background-color: #488f31;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+/* Thanh giao diện chatbot */
+#chatbot-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 33%;
+    max-width: 400px;
+    background-color: #fff;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.3);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header của chatbot */
+#chatbot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #488f31;
+    color: #fff;
+}
+
+/* Nút đóng chatbot */
+#close-chatbot {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2em;
+    cursor: pointer;
+}
+
+/* Phần thân của chatbot */
+#chatbot-body {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+/* Phần footer của chatbot */
+#chatbot-footer {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+}
+
+#user-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    resize: none; /* Vô hiệu hóa khả năng kéo thả */
+    overflow: hidden; /* Ẩn thanh cuộn */
+}
+
+button {
+    padding: 8px 15px;
+    background-color: #de425b;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 5px;
+}

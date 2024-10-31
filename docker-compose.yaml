@@ -119,8 +119,6 @@ services:
       - 1111:1111
     depends_on:
       - postgres-ct
-    volumes:
-      - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
 
 
 
