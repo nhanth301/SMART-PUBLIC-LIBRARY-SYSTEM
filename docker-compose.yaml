@@ -66,6 +66,8 @@ services:
     volumes:
       - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
       - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
+    env_file:
+      - .env
     command: ["airflow", "webserver"]
     restart: always
 
@@ -89,6 +91,8 @@ services:
     volumes:
       - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
       - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
+    env_file:
+      - .env
     command: ["airflow", "scheduler"]
     restart: always
     
@@ -115,5 +119,8 @@ services:
       - 1111:1111
     depends_on:
       - postgres-ct
+    volumes:
+      - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
+
 
 

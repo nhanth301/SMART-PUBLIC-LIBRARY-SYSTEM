@@ -7,16 +7,24 @@ import re
 import sqlite3
 import psycopg2
 import requests
+from dotenv import load_dotenv
+import os
+import glob
 
-HOST = "https://zep.hcmute.fit/7561"
-SQLITE_DB_PATH = '/opt/airflow/calibre/metadata.db'
-PG_DB = 'spls'
-PG_USER = 'admin'
-PG_PASS = 'admin'
-PG_HOST = 'postgres-ct'
-PG_PORT = '5432'
+# Load environment variables
+load_dotenv('../.env')
 
+# Configuration
+HOST = os.getenv('HOST')
+SQLITE_DB_PATH = os.getenv('CALIBRE_DB_PATH')
+PG_DB = os.getenv('POSTGRES_DB')
+PG_USER = os.getenv('POSTGRES_USER')
+PG_PASS = os.getenv('POSTGRES_PASSWORD')
+PG_HOST = os.getenv('POSTGRES_HOST')
+PG_PORT = os.getenv('POSTGRES_INTERNAL_PORT')
+PATH="/opt/airflow/calibre/" 
 
+# Database connections
 sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
 pg_conn = psycopg2.connect(
             dbname=PG_DB,
@@ -25,8 +33,9 @@ pg_conn = psycopg2.connect(
             host=PG_HOST,
             port=PG_PORT)
 
+
 def extract_description(file_path):
-    """Trích xuất nội dung của trường description từ file XML."""
+    """Extract description content from XML file."""
     try:
         tree = ET.parse(file_path)
     except:
@@ -37,24 +46,25 @@ def extract_description(file_path):
     return description.text if description is not None else None
 
 def clean_description(raw_description):
-    """Chuẩn hóa và làm sạch nội dung description."""
+    """Normalize and clean description content."""
     if raw_description is None:
         return "NaN"
     
-    # Loại bỏ các thẻ HTML
+    # Remove HTML tags
     cleanr = re.compile('<.*?>')
     cleantext = re.sub(cleanr, '', raw_description)
     
-    # Chuẩn hóa khoảng trắng
+    # Normalize whitespace
     return ' '.join(cleantext.split())
 
 def connections_check(**kwargs):
+    """Verify database connections."""
     try:
-        # Kiểm tra kết nối đến SQLite
+        # Check SQLite connection
         sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
         print("SQLite connection successful.")
         
-        # Kiểm tra kết nối đến PostgreSQL
+        # Check PostgreSQL connection
         pg_conn = psycopg2.connect(
             dbname=PG_DB,
             user=PG_USER,
@@ -76,6 +86,7 @@ def connections_check(**kwargs):
         raise
 
 def close_connection(**kwargs):
+    """Close database connections."""
     try:
         sqlite_conn.close()
         pg_conn.close()
@@ -84,6 +95,7 @@ def close_connection(**kwargs):
         raise
 
 def extract_books(**kwargs):
+    """Extract book data from SQLite database."""
     try:
         cursor = sqlite_conn.cursor()
         cursor.execute('SELECT id, title, timestamp, pubdate, author_sort, path FROM books')
@@ -93,8 +105,9 @@ def extract_books(**kwargs):
             r = {
                     "id" : row[0],
                     "title":row[1],
-                    "summary":"/opt/airflow/calibre/" + row[5] + "/metadata.opf",
-                    "image": "/opt/airflow/calibre/" + row[5] + "/cover.jpg",
+                    "summary": (row[5] + "/metadata.opf").replace("'",'_'),
+                    "image": (row[5] + "/cover.jpg").replace("'",'_'),
+                    "pdf_file": (row[5]+ "/*.pdf").replace("'",'_'),
                     "author": row[4],
                     "created_date": row[2],
                     "published_date": row[3],
@@ -107,6 +120,7 @@ def extract_books(**kwargs):
         cursor.close()
     
 def extract_tags(**kwargs):
+    """Extract tag data from SQLite database."""
     try:
         cursor = sqlite_conn.cursor()
         cursor.execute('SELECT id, name FROM tags')
@@ -117,6 +131,7 @@ def extract_tags(**kwargs):
         cursor.close()
   
 def extract_books_tags(**kwargs):
+    """Extract book-tag relationships from SQLite database."""
     try:
         cursor = sqlite_conn.cursor()
         cursor.execute('SELECT book, tag FROM books_tags_link')
@@ -126,14 +141,15 @@ def extract_books_tags(**kwargs):
     finally:
         cursor.close()
 
-def filter(table_name, source_ids, dbpmk=False):
-    if dbpmk:
+def filter(table_name, source_ids):
+    """Compare source and destination IDs to find new and deleted records."""
+    if table_name == 'books_tags':
         try:
             pg_cursor = pg_conn.cursor()
             query = f"SELECT * from public.{table_name}"
             pg_cursor.execute(query)
             rows = pg_cursor.fetchall()
-            dest_ids = set(rows)
+            dest_ids = set([(row[0],row[1]) for row in rows])
         finally:
             pg_cursor.close()
         deleted_ids = dest_ids - source_ids
@@ -154,46 +170,57 @@ def filter(table_name, source_ids, dbpmk=False):
 
 
 def transform_books(**kwargs):
+    """Transform and enrich book data."""
     ti = kwargs['ti']
     data = ti.xcom_pull(task_ids='extract_books',key='book_data')
     source_ids = set([d["id"]for d in data])
     new_ids, deleted_ids = filter('books',source_ids)
+
     transformed_data = []
+    batch_size = 64
+    summaries, titles, imgs = [], [], []
+
+    # Prepare data for batch processing
     for e in data:
         if e['id'] in new_ids:
-            e['summary'] = clean_description(extract_description(e['summary']))
-            if e['summary'] != "NaN":  
-                e['summary_embed'] = requests.post(f'{HOST}/transform', json={'texts': [e['summary']]}).json()['embeddings'][0]
-            else:
-                e['summary_embed'] = [0.0] * 768
-            e['title_embed'] = requests.post(f'{HOST}/transform', json={'texts': [e['title']]}).json()['embeddings'][0]
-            with open(e['image'], 'rb') as img:
-                files = {'image': img}
-                e['img_embed']= requests.post(f'{HOST}/extract_img', files=files).json()['last_hidden_state'][0][0]
+            e['summary'] = clean_description(extract_description(PATH+e['summary']))
+            summaries.append(e['summary'])
+            titles.append(e['title'])
+            imgs.append(('image[]',open(PATH+e['image'], 'rb')))
+
+    # Process in batches
+    embed_summaries, embed_titles, embed_imgs = [], [], []
+    for i in range(0,len(summaries),batch_size):
+        batch_summaries = summaries[i:i+batch_size]
+        batch_titles = titles[i:i+batch_size]
+        batch_imgs = imgs[i:i+batch_size]
+
+        embed_summaries.extend(requests.post(f'{HOST}/transform', json={'texts': batch_summaries}).json()['embeddings'])
+        embed_titles.extend(requests.post(f'{HOST}/transform', json={'texts': batch_titles}).json()['embeddings'])
+        embed_imgs.extend(requests.post(f'{HOST}/extract_img', files=batch_imgs).json()['last_hidden_state'])
+
+    # Combine embeddings with original data    
+    count = 0
+    for e in data:
+        if e['id'] in new_ids:
+            e['summary_embed'] = embed_summaries[count]
+            e['title_embed'] = embed_titles[count]
+            e['img_embed']= embed_imgs[count]
             transformed_data.append(e)
+            count += 1
+    assert count == len(embed_summaries)
     ti.xcom_push(key='deleted_ids',value=deleted_ids)
     ti.xcom_push(key='transformed_data',value=transformed_data)
 
 def load_books(**kwargs):
+    """Load transformed book data into PostgreSQL."""
     ti = kwargs['ti']
     data = ti.xcom_pull(task_ids='transform_books',key='transformed_data')
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
-        INSERT INTO public.books (id, title, summary, image, author, created_date, published_date, modified_date, title_embed, summary_embed, img_embed)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO UPDATE
-        SET title = EXCLUDED.title,
-            summary = EXCLUDED.summary,
-            image = EXCLUDED.image,
-            author = EXCLUDED.author,
-            created_date = EXCLUDED.created_date,
-            published_date = EXCLUDED.published_date,
-            modified_date = EXCLUDED.modified_date,
-            title_embed = EXCLUDED.title_embed,
-            summary_embed = EXCLUDED.summary_embed,
-            img_embed = EXCLUDED.img_embed
-            ;
+        INSERT INTO public.books (id, title, summary, image, pdf_file, author, created_date, published_date, modified_date, title_embed, summary_embed, img_embed)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         '''
         
         for item in data:
@@ -202,6 +229,7 @@ def load_books(**kwargs):
                 item['title'],
                 item['summary'],
                 item['image'],
+                item['pdf_file'],
                 item['author'],
                 item['created_date'],
                 item['published_date'],
@@ -212,13 +240,13 @@ def load_books(**kwargs):
             ))
         deleted_ids = ti.xcom_pull(task_ids='transform_books',key='deleted_ids')
         if len(deleted_ids) > 0:
-            pg_cursor.execute("DELETE FROM books WHERE id IN %s",(tuple(deleted_ids),))
-        
+            pg_cursor.execute("DELETE FROM books WHERE id IN %s",(tuple(deleted_ids),)) 
         pg_conn.commit()
     finally:
         pg_cursor.close()
 
 def load_tags(**kwargs):
+    """Load tag data into PostgreSQL."""
     ti = kwargs['ti']
     rows = ti.xcom_pull(task_ids='extract_tags',key='tag_data')
     source_ids = set([row[0] for row in rows])
@@ -227,9 +255,7 @@ def load_tags(**kwargs):
         pg_cursor = pg_conn.cursor()
         insert_query = '''
         INSERT INTO public.tags (id, name)
-        VALUES (%s, %s)
-        ON CONFLICT (id) DO UPDATE
-        SET name = EXCLUDED.name;
+        VALUES (%s, %s);
         '''
         for row in rows:
             if row[0] in new_ids:
@@ -241,31 +267,35 @@ def load_tags(**kwargs):
         pg_cursor.close()
 
 def load_books_tags(**kwargs):
+    """Load book-tag relationships into PostgreSQL."""
     ti = kwargs['ti']
     rows = ti.xcom_pull(task_ids='extract_books_tags',key='book_tag_data')
+    source_ids = set([(row[0],row[1]) for row in rows])
+    new_ids, deleted_ids = filter('books_tags',source_ids)
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
         INSERT INTO public.books_tags (book_id, tag_id)
-        VALUES (%s, %s)
-        ON CONFLICT (book_id, tag_id) DO UPDATE
-        SET book_id = EXCLUDED.book_id,
-            tag_id = EXCLUDED.tag_id;
+        VALUES (%s, %s);
         '''
         for row in rows:
-            pg_cursor.execute(insert_query, (row[0],row[1]))
+            if (row[0],row[1]) in new_ids:
+                pg_cursor.execute(insert_query, (row[0],row[1]))
+        if len(deleted_ids) > 0:
+            for ids in deleted_ids:
+                pg_cursor.execute("DELETE FROM books_tags WHERE book_id = %s and tag_id = %s ",(ids[0],ids[1]))
         pg_conn.commit()
     finally:
         pg_cursor.close()
 
 
+# DAG definition
 default_args = {
     'owner': 'airflow',
     'start_date': datetime(2024, 9, 8),
     'execution_timeout': timedelta(minutes=10),  
 }
 
-# Define the DAG
 dag = DAG(
     'ETL',
     default_args=default_args,
@@ -273,8 +303,68 @@ dag = DAG(
     schedule_interval=None,
 )
 
-# Define the task
 
+
+# SQL statements for table creation
+create_books_table = PostgresOperator(
+    task_id = 'create_books_table',
+    sql="""
+    DO $$
+    BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+        CREATE EXTENSION vector;
+    END IF;
+    END $$;
+    CREATE TABLE IF NOT EXISTS public.books
+    (
+        id integer NOT NULL,
+        title character varying COLLATE pg_catalog."default" NOT NULL,
+        summary character varying COLLATE pg_catalog."default" NOT NULL,
+        image character varying COLLATE pg_catalog."default" NOT NULL,
+        pdf_file character varying COLLATE pg_catalog."default" NOT NULL,
+        author character varying COLLATE pg_catalog."default" NOT NULL,
+        published_date timestamp with time zone NOT NULL,
+        created_date timestamp with time zone NOT NULL,
+        modified_date timestamp with time zone NOT NULL,
+        title_embed vector(768),
+        summary_embed vector(768),
+        img_embed vector(768),
+        CONSTRAINT books_pkey PRIMARY KEY (id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.books OWNER to admin;
+    """
+)
+
+create_tags_table = PostgresOperator(
+    task_id = 'create_tags_table',
+    sql="""
+    CREATE TABLE IF NOT EXISTS public.tags
+    (
+        id integer NOT NULL,
+        name character varying NOT NULL,
+        CONSTRAINT tags_pkey PRIMARY KEY (id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.tags OWNER to admin;
+    """
+)
+
+create_books_tags_table = PostgresOperator(
+    task_id = 'create_books_tags_table',
+    sql="""
+    CREATE TABLE IF NOT EXISTS public.books_tags
+    (
+        book_id integer NOT NULL,
+        tag_id integer NOT NULL,
+        CONSTRAINT books_tags_pkey PRIMARY KEY (book_id, tag_id)
+    )
+    TABLESPACE pg_default;
+    ALTER TABLE IF EXISTS public.books_tags OWNER to admin;
+    """
+)
+
+# Task definitions
 check_conn_task = PythonOperator(
     task_id = 'check_connections',
     python_callable = connections_check,
@@ -306,63 +396,6 @@ transform_books_task = PythonOperator(
     dag=dag
 )
 
-create_books_table = PostgresOperator(
-    task_id = 'create_books_table',
-    sql="""
-    DO $$
-    BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
-        CREATE EXTENSION vector;
-    END IF;
-    END $$;
-    CREATE TABLE IF NOT EXISTS public.books
-    (
-        id integer NOT NULL,
-        title character varying COLLATE pg_catalog."default" NOT NULL,
-        summary character varying COLLATE pg_catalog."default" NOT NULL,
-        image character varying COLLATE pg_catalog."default" NOT NULL,
-        author character varying COLLATE pg_catalog."default" NOT NULL,
-        published_date timestamp with time zone NOT NULL,
-        created_date timestamp with time zone NOT NULL,
-        modified_date timestamp with time zone NOT NULL,
-        title_embed vector(768),
-        summary_embed vector(768),
-        img_embed vector(768),
-        CONSTRAINT books_pkey PRIMARY KEY (id)
-    )
-    TABLESPACE pg_default;
-    ALTER TABLE IF EXISTS public.books OWNER to admin;
-    """
-)
-
-create_tags_table = PostgresOperator(
-    task_id = 'create_tags_table',
-    sql="""
-    CREATE TABLE IF NOT EXISTS public.books_tags
-    (
-        book_id integer NOT NULL,
-        tag_id integer NOT NULL,
-        CONSTRAINT books_tags_pkey PRIMARY KEY (book_id, tag_id)
-    )
-    TABLESPACE pg_default;
-    ALTER TABLE IF EXISTS public.books_tags OWNER to admin;
-    """
-)
-
-create_books_tags_table = PostgresOperator(
-    task_id = 'create_books_tags_table',
-    sql="""
-    CREATE TABLE IF NOT EXISTS public.tags
-    (
-        id integer NOT NULL,
-        name character varying NOT NULL,
-        CONSTRAINT tags_pkey PRIMARY KEY (id)
-    )
-    TABLESPACE pg_default;
-    ALTER TABLE IF EXISTS public.tags OWNER to admin;
-    """
-)
-
 load_books_task = PythonOperator(
     task_id='load_books',
     python_callable=load_books,
@@ -387,6 +420,7 @@ close_conn_task = PythonOperator(
     dag=dag
 )
 
+# Define task dependencies
 check_conn_task >> [extract_books_task, extract_tags_task, extract_books_tags_task] 
 extract_books_task >> create_books_table >> transform_books_task >> load_books_task
 extract_tags_task >> create_tags_table   >> load_tags_task
