@@ -18,11 +18,15 @@ load_dotenv('../.env')
 # Configuration
 HOST = os.getenv('HOST')
 SQLITE_DB_PATH = os.getenv('CALIBRE_DB_PATH')
+
 PG_DB = os.getenv('POSTGRES_DB')
 PG_USER = os.getenv('POSTGRES_USER')
 PG_PASS = os.getenv('POSTGRES_PASSWORD')
 PG_HOST = os.getenv('POSTGRES_HOST')
 PG_PORT = os.getenv('POSTGRES_INTERNAL_PORT')
+
+
+
 PATH="/opt/airflow/calibre/" 
 
 # Database connections
@@ -85,6 +89,7 @@ def connections_check(**kwargs):
                 port=PG_PORT                 
             )
         )
+
     
     except sqlite3.Error as e:
         print(f"SQLite error: {e}")
@@ -428,7 +433,8 @@ create_ui_history_table = PostgresOperator(
             uid INTEGER,
             bid INTEGER,
             action VARCHAR(50),
-            timestamp BIGINT
+            timestamp BIGINT,
+            isWH boolean DEFAULT false
         )
         TABLESPACE pg_default;
         ALTER TABLE IF EXISTS public.ui_history OWNER TO admin;
@@ -445,13 +451,190 @@ create_rec_history_table = PostgresOperator(
             sid VARCHAR(50),
             uid INTEGER,
             bid INTEGER,
-            timestamp BIGINT
+            timestamp BIGINT,
+            isWH boolean DEFAULT false
         )
         TABLESPACE pg_default;
         ALTER TABLE IF EXISTS public.rec_history OWNER TO admin;
     """,
     dag=dag
 )
+
+create_model_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
+    task_id = 'create_model_table',
+    sql = """
+        CREATE TABLE IF NOT EXISTS public.model
+        (
+            id SERIAL NOT NULL,
+            type character varying NOT NULL,
+            weights JSON NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT model_pkey PRIMARY KEY (id)
+        )
+        TABLESPACE pg_default;
+
+        ALTER TABLE IF EXISTS public.model OWNER TO admin;
+    """,
+    dag=dag
+)
+
+create_warehouse = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
+    task_id = 'create_warehouse',
+    sql="""
+        CREATE TABLE IF NOT EXISTS DIM_Time (
+    timeID SERIAL PRIMARY KEY,
+    date DATE NOT NULL UNIQUE,
+    day INT NOT NULL,
+    month INT NOT NULL,
+    year INT NOT NULL,
+    quarter INT NOT NULL,
+    day_name VARCHAR(20) NOT NULL,
+    week_of_year INT NOT NULL,
+    is_weekend BOOLEAN NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS DIM_Action (
+    actionID SERIAL PRIMARY KEY,
+    actionName VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS Fact_Recommendation (
+    factID SERIAL PRIMARY KEY,
+    sessionID INT NOT NULL,
+    userID INT NOT NULL,
+    bookID INT NOT NULL,
+    actionID INT NOT NULL REFERENCES DIM_Action(actionID),
+    timeID INT NOT NULL REFERENCES DIM_Time(timeID),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Fact_User_Interaction (
+    factID SERIAL PRIMARY KEY,
+    sessionID INT NOT NULL,
+    userID INT NOT NULL,
+    bookID INT NOT NULL,
+    actionID INT NOT NULL REFERENCES DIM_Action(actionID),
+    timeID INT NOT NULL REFERENCES DIM_Time(timeID),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE tablename = 'fact_recommendation' 
+        AND indexname = 'idx_fact_recommendation_timeid'
+    ) THEN
+        CREATE INDEX idx_fact_recommendation_timeid ON Fact_Recommendation(timeID);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE tablename = 'fact_recommendation' 
+        AND indexname = 'idx_fact_recommendation_actionid'
+    ) THEN
+        CREATE INDEX idx_fact_recommendation_actionid ON Fact_Recommendation(actionID);
+    END IF;
+END $$;
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE tablename = 'fact_user_interaction' 
+            AND indexname = 'idx_fact_user_interaction_timeid'
+        ) THEN
+            CREATE INDEX idx_fact_user_interaction_timeid ON Fact_User_Interaction(timeID);
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE tablename = 'fact_user_interaction' 
+            AND indexname = 'idx_fact_user_interaction_actionid'
+        ) THEN
+            CREATE INDEX idx_fact_user_interaction_actionid ON Fact_User_Interaction(actionID);
+        END IF;
+    END $$;
+
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM DIM_Action) THEN
+        INSERT INTO DIM_Action (actionName, description) VALUES
+            ('click', 'User clicked the book'),
+            ('read', 'User read the book'),
+            ('skip', 'User skipped (not care) the book');
+    END IF;
+END $$;
+
+DO $$ 
+DECLARE 
+    curr_date DATE := '2024-01-01';  -- Changed from current_date to curr_date
+    end_date DATE := '2026-12-31';
+BEGIN
+    WHILE curr_date <= end_date LOOP  -- Changed from current_date to curr_date
+        IF NOT EXISTS (SELECT 1 FROM DIM_Time WHERE date = curr_date) THEN  -- Changed from current_date to curr_date
+            INSERT INTO DIM_Time (date, day, month, year, quarter, day_name, week_of_year, is_weekend)
+            VALUES (
+                curr_date,  -- Changed from current_date to curr_date
+                EXTRACT(DAY FROM curr_date),  -- Changed from current_date to curr_date
+                EXTRACT(MONTH FROM curr_date),  -- Changed from current_date to curr_date
+                EXTRACT(YEAR FROM curr_date),  -- Changed from current_date to curr_date
+                CASE 
+                    WHEN EXTRACT(MONTH FROM curr_date) BETWEEN 1 AND 3 THEN 1  -- Changed from current_date to curr_date
+                    WHEN EXTRACT(MONTH FROM curr_date) BETWEEN 4 AND 6 THEN 2  -- Changed from current_date to curr_date
+                    WHEN EXTRACT(MONTH FROM curr_date) BETWEEN 7 AND 9 THEN 3  -- Changed from current_date to curr_date
+                    ELSE 4
+                END,
+                TO_CHAR(curr_date, 'Day'),  -- Changed from current_date to curr_date
+                EXTRACT(WEEK FROM curr_date),  -- Changed from current_date to curr_date
+                CASE WHEN EXTRACT(DOW FROM curr_date) IN (6, 0) THEN TRUE ELSE FALSE END  -- Changed from current_date to curr_date
+            );
+        END IF;
+        curr_date := curr_date + INTERVAL '1 day';  -- Changed from current_date to curr_date
+    END LOOP;
+END $$;
+        CREATE OR REPLACE FUNCTION get_time_id(unix_timestamp BIGINT) 
+        RETURNS INT AS $$
+        DECLARE
+            date_value DATE;
+            time_id INT;
+        BEGIN
+            -- Convert unix timestamp to date
+            date_value := to_timestamp(unix_timestamp)::DATE;
+            
+            -- Get timeID from DIM_Time
+            SELECT timeID INTO time_id
+            FROM DIM_Time
+            WHERE date = date_value;
+            
+            RETURN time_id;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        -- Function to get actionID from action name
+        CREATE OR REPLACE FUNCTION get_action_id(action_name VARCHAR) 
+        RETURNS INT AS $$
+        DECLARE
+            action_id INT;
+        BEGIN
+            SELECT actionID INTO action_id
+            FROM DIM_Action
+            WHERE actionName = action_name;
+            
+            RETURN action_id;
+        END;
+        $$ LANGUAGE plpgsql;
+        ALTER TABLE public.DIM_Time OWNER to admin;
+        ALTER TABLE public.DIM_Action OWNER to admin;
+        ALTER TABLE public.Fact_Recommendation OWNER to admin;
+        ALTER TABLE public.Fact_User_Interaction OWNER to admin;
+    """,
+    dag=dag
+)
+
+
 
 # Task definitions
 check_conn_task = PythonOperator(
@@ -516,7 +699,7 @@ close_conn_task = PythonOperator(
 )
 
 # Define task dependencies
-check_conn_task >> [create_ui_history_table,create_rec_history_table,extract_books_task, extract_tags_task, extract_books_tags_task] 
+check_conn_task >> [create_warehouse, create_model_table,create_ui_history_table,create_rec_history_table,extract_books_task, extract_tags_task, extract_books_tags_task] 
 extract_books_task >> create_books_table >> transform_books_task >> load_books_task
 extract_tags_task >> create_tags_table >> transform_tags_task >> load_tags_task
 extract_books_tags_task >> create_books_tags_table >> load_books_tags_task

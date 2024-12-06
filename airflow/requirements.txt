@@ -4,3 +4,4 @@ apache-airflow[postgres]
 redis
 python-dotenv
 numpy
+pandas

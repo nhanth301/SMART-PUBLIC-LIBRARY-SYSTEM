@@ -10,7 +10,8 @@ import os
 import torch
 import ast
 from collections import defaultdict
-
+from src.adapter import LinearAdapter
+import numpy as np
 PG_DB = os.getenv('POSTGRES_DB')
 PG_USER = os.getenv('POSTGRES_USER')
 PG_PASS = os.getenv('POSTGRES_PASSWORD')
@@ -42,21 +43,32 @@ def load_model(**kwargs):
                 ORDER BY timestamp DESC
                 LIMIT 1;
             """
+            query3 = """
+                SELECT weights
+                FROM public.model
+                WHERE type LIKE 'adapter'
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """
             cursor.execute(query1)
             result1 = cursor.fetchone() 
             cursor.execute(query2)
             result2 = cursor.fetchone()
-            
-            if result1 and result2:
+            cursor.execute(query3)
+            result3 = cursor.fetchone()
+            adapter = result3['weights']
+            ti = kwargs['ti']
+            ti.xcom_push(key='adapter', value=adapter)
+            if result1 and result2 and result3:
                 weights = result1['weights']
                 optim = result2['weights']
-                ti = kwargs['ti']
                 ti.xcom_push(key='weights', value=weights)
                 ti.xcom_push(key='optim', value=optim)
-                return weights, optim
+                
+                return weights, optim, adapter
             else:
                 print("No weights found in the model table.")
-                return None, None
+                return None, None, None
     
     except psycopg2.Error as e:
         print(f"PostgreSQL error: {e}")
@@ -69,7 +81,13 @@ def load_model(**kwargs):
             print("PostgreSQL connection closed.")
 
 def train_model(**kwargs):
-
+    ti = kwargs['ti']
+    pretrained_weights = ti.xcom_pull(task_ids='load_model_state', key='weights')
+    pretrained_optim = ti.xcom_pull(task_ids='load_model_state', key='optim')
+    pretrained_adapter = ti.xcom_pull(task_ids='load_model_state', key='adapter')
+    pretrained_adapter = {k: torch.tensor(np.array(v)) for k, v in pretrained_adapter.items()}
+    adapter_model = LinearAdapter(input_dim=768,output_dim=128)
+    adapter_model.load_state_dict(pretrained_adapter)
     try:
         pg_conn = psycopg2.connect(
             dbname=PG_DB,
@@ -87,7 +105,7 @@ def train_model(**kwargs):
             ORDER BY idx;
         """
         cursor.execute(query)
-        embeddings = [torch.tensor(ast.literal_eval(row[0])) for row in cursor.fetchall()]
+        embeddings = [adapter_model(torch.tensor(ast.literal_eval(row[0]))).detach() for row in cursor.fetchall()]
 
         query = """
             SELECT 
@@ -143,9 +161,6 @@ def train_model(**kwargs):
             return tuple(convert_tensors_to_lists(item) for item in d)
         else:
             return d
-    ti = kwargs['ti']
-    pretrained_weights = ti.xcom_pull(task_ids='load_model_state', key='weights')
-    pretrained_optim = ti.xcom_pull(task_ids='load_model_state', key='optim')
     new_weights, new_optim = train(ui_history,embeddings,5,10,pretrained_weights, pretrained_optim)
     weights_serialized = {k: v.tolist() for k, v in new_weights.items()}
     optim_serialized = convert_tensors_to_lists(new_optim)
@@ -221,23 +236,7 @@ dag = DAG(
     schedule_interval=None, 
 )
 
-create_model_table = PostgresOperator(
-    task_id = 'create_model_table',
-    sql = """
-        CREATE TABLE IF NOT EXISTS public.model
-        (
-            id SERIAL NOT NULL,
-            type character varying NOT NULL,
-            weights JSON NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT model_pkey PRIMARY KEY (id)
-        )
-        TABLESPACE pg_default;
 
-        ALTER TABLE IF EXISTS public.model OWNER TO admin;
-    """,
-    dag=dag
-)
 
 
 load_model_state_task = PythonOperator(
@@ -258,7 +257,7 @@ save_model_state_task = PythonOperator(
     dag=dag,
 )
 
-create_model_table >> load_model_state_task >> train_task >> save_model_state_task
+load_model_state_task >> train_task >> save_model_state_task
 
 
 

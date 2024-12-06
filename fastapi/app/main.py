@@ -13,6 +13,7 @@ import json
 from typing import List, Union
 import redis
 import time
+from adapter import LinearAdapter
 
 PG_DB = os.getenv('POSTGRES_DB')
 PG_USER = os.getenv('POSTGRES_USER')
@@ -21,6 +22,7 @@ PG_HOST = os.getenv('POSTGRES_HOST')
 PG_PORT = os.getenv('POSTGRES_INTERNAL_PORT')
 pg_conn = None
 state_dict = None
+adapter_w = None
 embedding_dim = None 
 action_dim = None
 model = None
@@ -56,9 +58,21 @@ try:
         """
         cursor.execute(query2)
         result2 = cursor.fetchone() 
-        if result1 and result2:
+
+        query3 = """
+            SELECT weights
+            FROM public.model
+            WHERE type = 'adapter'
+            ORDER BY timestamp DESC
+            LIMIT 1;
+        """
+        cursor.execute(query3)
+        result3 = cursor.fetchone() 
+
+        if result1 and result2 and result3:
             state_dict = result1['weights']
             metadata = result2['weights']
+            adapter_w = result3['weights']
             embedding_dim = metadata['embedding_dim']
             action_dim = metadata['action_dim']
             print("Load state_dict successfully")
@@ -81,7 +95,10 @@ try:
     ORDER BY idx;
     """
     cursor.execute(query)
-    embeddings = [torch.tensor(ast.literal_eval(row[0])) for row in cursor.fetchall()]
+    adapter = LinearAdapter(768,128)
+    adapter_w = {k: torch.tensor(np.array(v)) for k, v in adapter_w.items()}
+    adapter.load_state_dict(adapter_w)
+    embeddings = [adapter(torch.tensor(ast.literal_eval(row[0]))).detach() for row in cursor.fetchall()]
     print("Load embedding successfully")
     cursor.close()          
 except Exception as e:
@@ -94,6 +111,7 @@ try:
     model = PolicyNetwork(embedding_dim,action_dim)
     state_dict = {k: torch.tensor(np.array(v)) for k, v in state_dict.items()}
     model.load_state_dict(state_dict)
+    
 except Exception as e:
     print(e)
 

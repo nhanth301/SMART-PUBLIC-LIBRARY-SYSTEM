@@ -58,10 +58,7 @@ class REINFORCE:
 
                 log_probs = torch.stack(log_probs)
                 batch_entropy = torch.stack(batch_entropy)
-                
-                if len(session_rewards) > 1:
-                    session_rewards = (session_rewards - session_rewards.mean()) / (session_rewards.std() + 1e-8)
-                
+                               
                 discounted_rewards = []
                 running_reward = 0
                 gamma = 0.99

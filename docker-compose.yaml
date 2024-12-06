@@ -16,6 +16,7 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+  
 
   pgadmin4:
     image: elestio/pgadmin:REL-8_7

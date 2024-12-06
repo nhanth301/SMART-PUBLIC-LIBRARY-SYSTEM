@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, embedding_dim, action_dim, hidden_dim=256):
+    def __init__(self, embedding_dim, action_dim, hidden_dim=64):
         super(PolicyNetwork, self).__init__()
         
         self.REWARD_SKIP = -1.0

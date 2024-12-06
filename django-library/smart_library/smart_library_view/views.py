@@ -125,7 +125,6 @@ def get_books_with_tags(books):
         books_data.append(book_data)
 
     return books_data
-from django.http import HttpResponse
 
 def index(request):
     try:
@@ -290,3 +289,5 @@ def handle_click(request):
 
     else:
         return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+

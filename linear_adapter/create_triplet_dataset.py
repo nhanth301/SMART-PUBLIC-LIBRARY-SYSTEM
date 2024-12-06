@@ -13,6 +13,7 @@ if __name__ == "__main__":
     )   
 
     query = """
+    INSERT INTO triplet_data (anchor, pos, neg)
     SELECT ta.tag_embed as anchor, b.summary_embed as pos, (SELECT tag_embed FROM tags WHERE id <> ta.id ORDER BY ta.tag_embed <-> tags.tag_embed LIMIT 1) as neg
     FROM tags as ta
     JOIN 
