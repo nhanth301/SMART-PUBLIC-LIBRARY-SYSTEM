@@ -10,7 +10,6 @@ import requests
 from dotenv import load_dotenv
 import os
 import glob
-
 # Load environment variables
 load_dotenv('../.env')
 
@@ -98,7 +97,7 @@ def extract_books(**kwargs):
     """Extract book data from SQLite database."""
     try:
         cursor = sqlite_conn.cursor()
-        cursor.execute('SELECT id, title, timestamp, pubdate, author_sort, path FROM books')
+        cursor.execute('''SELECT b.id, b.title, b.timestamp, b.pubdate, GROUP_CONCAT(a.name, ', '), b.path FROM books AS b JOIN books_authors_link AS bal ON b.id = bal.book JOIN authors AS a ON bal.author = a.id GROUP BY b.id, b.title, b.timestamp, b.pubdate, b.path''')
         rows = cursor.fetchall()
         data = []
         for row in rows:
@@ -178,7 +177,7 @@ def transform_books(**kwargs):
 
     transformed_data = []
     batch_size = 64
-    summaries, titles, imgs = [], [], []
+    summaries, titles = [], []
 
     # Prepare data for batch processing
     for e in data:
@@ -186,18 +185,15 @@ def transform_books(**kwargs):
             e['summary'] = clean_description(extract_description(PATH+e['summary']))
             summaries.append(e['summary'])
             titles.append(e['title'])
-            imgs.append(('image[]',open(PATH+e['image'], 'rb')))
 
     # Process in batches
     embed_summaries, embed_titles, embed_imgs = [], [], []
     for i in range(0,len(summaries),batch_size):
         batch_summaries = summaries[i:i+batch_size]
         batch_titles = titles[i:i+batch_size]
-        batch_imgs = imgs[i:i+batch_size]
 
         embed_summaries.extend(requests.post(f'{HOST}/transform', json={'texts': batch_summaries}).json()['embeddings'])
         embed_titles.extend(requests.post(f'{HOST}/transform', json={'texts': batch_titles}).json()['embeddings'])
-        embed_imgs.extend(requests.post(f'{HOST}/extract_img', files=batch_imgs).json()['last_hidden_state'])
 
     # Combine embeddings with original data    
     count = 0
@@ -205,12 +201,44 @@ def transform_books(**kwargs):
         if e['id'] in new_ids:
             e['summary_embed'] = embed_summaries[count]
             e['title_embed'] = embed_titles[count]
-            e['img_embed']= embed_imgs[count]
             transformed_data.append(e)
             count += 1
     assert count == len(embed_summaries)
     ti.xcom_push(key='deleted_ids',value=deleted_ids)
     ti.xcom_push(key='transformed_data',value=transformed_data)
+
+def transform_tags(**kwargs):
+    ti = kwargs['ti']
+    rows = ti.xcom_pull(task_ids='extract_tags',key='tag_data')
+    source_ids = set([row[0] for row in rows])
+    new_ids, deleted_ids = filter('tags',source_ids)
+
+    transformed_data = []
+    batch_size = 64
+    tag_names = []
+
+    for row in rows:
+        if row[0] in new_ids:
+            tag_names.append(row[1])
+    
+    tag_embeds = []
+    for i in range(0,len(tag_names),batch_size):
+        batch_names = tag_names[i:i+batch_size]
+        tag_embeds.extend(requests.post(f'{HOST}/transform', json={'texts': batch_names}).json()['embeddings'])
+    
+    count = 0
+    for row in rows:
+        if row[0] in new_ids:
+            e = {}
+            e['id'] = row[0]
+            e['name'] = row[1]
+            e['embed'] = tag_embeds[count]
+            transformed_data.append(e)
+            count += 1
+    assert count == len(tag_embeds)
+    ti.xcom_push(key='deleted_ids',value=deleted_ids)
+    ti.xcom_push(key='transformed_data',value=transformed_data)
+
 
 def load_books(**kwargs):
     """Load transformed book data into PostgreSQL."""
@@ -219,8 +247,8 @@ def load_books(**kwargs):
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
-        INSERT INTO public.books (id, title, summary, image, pdf_file, author, created_date, published_date, modified_date, title_embed, summary_embed, img_embed)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        INSERT INTO public.books (id, title, summary, image, pdf_file, author, created_date, published_date, modified_date, title_embed, summary_embed)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         '''
         
         for item in data:
@@ -235,12 +263,11 @@ def load_books(**kwargs):
                 item['published_date'],
                 item['modified_date'],
                 item['title_embed'],
-                item['summary_embed'],
-                item['img_embed']
+                item['summary_embed']
             ))
         deleted_ids = ti.xcom_pull(task_ids='transform_books',key='deleted_ids')
         if len(deleted_ids) > 0:
-            pg_cursor.execute("DELETE FROM books WHERE id IN %s",(tuple(deleted_ids),)) 
+            pg_cursor.execute("UPDATE books SET active = false WHERE id IN %s", (tuple(deleted_ids),))
         pg_conn.commit()
     finally:
         pg_cursor.close()
@@ -248,18 +275,16 @@ def load_books(**kwargs):
 def load_tags(**kwargs):
     """Load tag data into PostgreSQL."""
     ti = kwargs['ti']
-    rows = ti.xcom_pull(task_ids='extract_tags',key='tag_data')
-    source_ids = set([row[0] for row in rows])
-    new_ids, deleted_ids = filter('tags',source_ids)
+    data = ti.xcom_pull(task_ids='transform_tags',key='transformed_data')
     try:
         pg_cursor = pg_conn.cursor()
         insert_query = '''
-        INSERT INTO public.tags (id, name)
-        VALUES (%s, %s);
+        INSERT INTO public.tags (id, name, tag_embed)
+        VALUES (%s, %s, %s);
         '''
-        for row in rows:
-            if row[0] in new_ids:
-                pg_cursor.execute(insert_query, (row[0],row[1]))
+        for e in data:
+            pg_cursor.execute(insert_query, (e["id"],e["name"],e["embed"]))
+        deleted_ids = ti.xcom_pull(task_ids='transform_tags',key='deleted_ids')
         if len(deleted_ids) > 0:
             pg_cursor.execute("DELETE FROM tags WHERE id IN %s",(tuple(deleted_ids),))
         pg_conn.commit()
@@ -287,6 +312,7 @@ def load_books_tags(**kwargs):
         pg_conn.commit()
     finally:
         pg_cursor.close()
+
 
 
 # DAG definition
@@ -317,6 +343,7 @@ create_books_table = PostgresOperator(
     END $$;
     CREATE TABLE IF NOT EXISTS public.books
     (
+        idx serial PRIMARY KEY,
         id integer NOT NULL,
         title character varying COLLATE pg_catalog."default" NOT NULL,
         summary character varying COLLATE pg_catalog."default" NOT NULL,
@@ -328,40 +355,83 @@ create_books_table = PostgresOperator(
         modified_date timestamp with time zone NOT NULL,
         title_embed vector(768),
         summary_embed vector(768),
-        img_embed vector(768),
-        CONSTRAINT books_pkey PRIMARY KEY (id)
+        active boolean DEFAULT true
     )
     TABLESPACE pg_default;
-    ALTER TABLE IF EXISTS public.books OWNER to admin;
-    """
+    ALTER TABLE public.books OWNER to admin;
+    """,
+    dag=dag
 )
 
 create_tags_table = PostgresOperator(
     task_id = 'create_tags_table',
     sql="""
+    DO $$
+    BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+        CREATE EXTENSION vector;
+    END IF;
+    END $$;
     CREATE TABLE IF NOT EXISTS public.tags
     (
         id integer NOT NULL,
         name character varying NOT NULL,
+        tag_embed vector(768),
         CONSTRAINT tags_pkey PRIMARY KEY (id)
     )
     TABLESPACE pg_default;
     ALTER TABLE IF EXISTS public.tags OWNER to admin;
-    """
+    """,
+    dag=dag
 )
 
 create_books_tags_table = PostgresOperator(
     task_id = 'create_books_tags_table',
     sql="""
-    CREATE TABLE IF NOT EXISTS public.books_tags
-    (
-        book_id integer NOT NULL,
-        tag_id integer NOT NULL,
-        CONSTRAINT books_tags_pkey PRIMARY KEY (book_id, tag_id)
-    )
-    TABLESPACE pg_default;
-    ALTER TABLE IF EXISTS public.books_tags OWNER to admin;
-    """
+        CREATE TABLE IF NOT EXISTS public.books_tags
+        (
+            book_id integer NOT NULL,
+            tag_id integer NOT NULL,
+            CONSTRAINT books_tags_pkey PRIMARY KEY (book_id, tag_id)
+        )
+        TABLESPACE pg_default;
+        ALTER TABLE IF EXISTS public.books_tags OWNER to admin;
+    """,
+    dag=dag
+)
+
+
+create_ui_history_table = PostgresOperator(
+    task_id='create_ui_history_table',
+    sql="""
+        CREATE TABLE IF NOT EXISTS public.ui_history
+        (
+            sid VARCHAR(50),
+            uid INTEGER,
+            bid INTEGER,
+            action VARCHAR(50),
+            timestamp BIGINT
+        )
+        TABLESPACE pg_default;
+        ALTER TABLE IF EXISTS public.ui_history OWNER TO admin;
+    """,
+    dag=dag
+)
+
+create_rec_history_table = PostgresOperator(
+    task_id='create_rec_history_table',
+    sql="""
+        CREATE TABLE IF NOT EXISTS public.rec_history
+        (
+            sid VARCHAR(50),
+            uid INTEGER,
+            bid INTEGER,
+            timestamp BIGINT
+        )
+        TABLESPACE pg_default;
+        ALTER TABLE IF EXISTS public.rec_history OWNER TO admin;
+    """,
+    dag=dag
 )
 
 # Task definitions
@@ -396,6 +466,12 @@ transform_books_task = PythonOperator(
     dag=dag
 )
 
+transform_tags_task = PythonOperator(
+    task_id='transform_tags',
+    python_callable= transform_tags,
+    dag=dag
+)
+
 load_books_task = PythonOperator(
     task_id='load_books',
     python_callable=load_books,
@@ -421,8 +497,11 @@ close_conn_task = PythonOperator(
 )
 
 # Define task dependencies
-check_conn_task >> [extract_books_task, extract_tags_task, extract_books_tags_task] 
+check_conn_task >> [create_ui_history_table,create_rec_history_table,extract_books_task, extract_tags_task, extract_books_tags_task] 
 extract_books_task >> create_books_table >> transform_books_task >> load_books_task
-extract_tags_task >> create_tags_table   >> load_tags_task
+extract_tags_task >> create_tags_table >> transform_tags_task >> load_tags_task
 extract_books_tags_task >> create_books_tags_table >> load_books_tags_task
 [load_books_task, load_tags_task, load_books_tags_task] >> close_conn_task
+
+
+

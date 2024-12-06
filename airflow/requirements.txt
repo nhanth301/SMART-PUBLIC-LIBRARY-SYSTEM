@@ -1,0 +1,6 @@
+torch
+psycopg2-binary
+apache-airflow[postgres]
+redis
+python-dotenv
+numpy

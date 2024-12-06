@@ -1,16 +1,25 @@
-/* Nút chatbot cố định bên phải */
+
 #chatbot-toggle-btn {
     position: fixed;
     right: 10px;
-    top: 50%;
+    bottom: 20px;
     transform: translateY(-50%);
     padding: 10px 20px;
-    background-color: #488f31;
+    background-color: #45b29d;
     color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 50px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-size: 1em;
     cursor: pointer;
     z-index: 1000;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+
+}
+
+#chatbot-toggle-btn:hover {
+    background-color: #3a7228;
+    transform: scale(1.02); /* Phóng to nhẹ */
 }
 
 /* Thanh giao diện chatbot */
@@ -19,8 +28,8 @@
     right: 0;
     top: 0;
     height: 100%;
-    width: 33%;
-    max-width: 400px;
+    width: 30%;
+    max-width: 800px;
     background-color: #fff;
     box-shadow: -2px 0 5px rgba(0, 0, 0, 0.3);
     transform: translateX(100%);
@@ -36,7 +45,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background-color: #488f31;
+    background-color: #45b29d;
     color: #fff;
 }
 
@@ -54,6 +63,8 @@
     flex: 1;
     padding: 10px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Phần footer của chatbot */
@@ -63,6 +74,13 @@
     padding: 10px;
     border-top: 1px solid #ccc;
 }
+
+#chatbot-response {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 
 #user-input {
     flex: 1;
@@ -81,4 +99,37 @@ button {
     border-radius: 5px;
     cursor: pointer;
     margin-left: 5px;
+}
+
+
+.message {
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 75%;
+    word-wrap: break-word;
+  }
+  
+/* Tin nhắn của người dùng */
+.message.user {
+    align-self: flex-end;
+    background-color: #45b29d ;
+    color: #fff;
+    border-radius: 10px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+/* Tin nhắn của chatbot */
+.message.bot {
+    align-self: flex-start;
+    background-color: #f1f1f1;
+    color: #333;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+.message.bot b {
+    display: block; /* Mỗi phần <b> sẽ xuống dòng */
+    margin-top: 10px; /* Thêm khoảng cách giữa các đoạn văn */
 }

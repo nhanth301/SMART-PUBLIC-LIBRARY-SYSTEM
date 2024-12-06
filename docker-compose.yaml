@@ -31,6 +31,7 @@ services:
     depends_on:
       - airflow-postgres-ct
       - postgres-ct
+      
 
   airflow-postgres-ct:
     image: postgres:16.2
@@ -46,10 +47,11 @@ services:
 
   airflow-webserver:
     build: 
-      dockerfile: Dockerfile
+      dockerfile: airflow/Dockerfile
     depends_on:
       - airflow-postgres-ct
       - postgres-ct
+      - kafka-ct
     environment:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
       - TZ=Asia/Ho_Chi_Minh
@@ -61,6 +63,10 @@ services:
       - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__SCHEDULER__LOCAL_TASK_JOB_HEARTBEAT_SEC=600
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__PARALLELISM=32  
+      - AIRFLOW__CORE__DAG_CONCURRENCY=16  
+      - AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG=2 
     ports:
       - ${AIRFLOW_WEBSERVER_EXTERNAL_PORT}:${AIRFLOW_WEBSERVER_INTERNAL_PORT}
     volumes:
@@ -73,10 +79,11 @@ services:
 
   airflow-scheduler:
     build: 
-      dockerfile: Dockerfile
+      dockerfile: airflow/Dockerfile
     depends_on:
       - airflow-postgres-ct
       - postgres-ct
+      - kafka-ct
     environment:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://airflow:airflow@airflow-postgres-ct:${AIRFLOW_POSTGRES_INTERNAL_PORT}/airflow
       - TZ=Asia/Ho_Chi_Minh
@@ -88,6 +95,11 @@ services:
       - AIRFLOW_USER_EMAIL=${AIRFLOW_USER_EMAIL}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__SCHEDULER__LOCAL_TASK_JOB_HEARTBEAT_SEC=600
+      - AIRFLOW__SCHEDULER__SCHEDULER_HEALTH_CHECK_THRESHOLD=240
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__PARALLELISM=32 
+      - AIRFLOW__CORE__DAG_CONCURRENCY=16 
+      - AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG=2  
     volumes:
       - ${AIRFLOW_DAGS_VOLUME}:/opt/airflow/dags/
       - ${CALIBRE_LIBRARY_VOLUME}:/opt/airflow/calibre/
@@ -119,6 +131,55 @@ services:
       - 1111:1111
     depends_on:
       - postgres-ct
+      - fast-api
+    volumes:
+      - ${CALIBRE_LIBRARY_VOLUME}:/app/smart_library/media/calibre-library-image
+      - ./flask-web-library/:/app
+  
+  fast-api:
+    build: 
+      dockerfile: fastapi/Dockerfile
+    ports:
+      - 88:88
+    env_file:
+      - .env
+    depends_on:
+      - postgres-ct
+      - redis-ct
+    volumes:
+      - ./fastapi/app/:/code/app
+  
+  quixstream-ct:
+    build: 
+      dockerfile: quixstream/Dockerfile
+    depends_on:
+      - redis-ct
+      - kafka-ct
+      - fast-api
+    volumes:
+      - ./quixstream/app/:/code/app
+  
+  zookeeper-ct:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+  kafka-ct:
+    image: wurstmeister/kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka-ct
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-ct:2181
+  
+  redis-ct:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 
 

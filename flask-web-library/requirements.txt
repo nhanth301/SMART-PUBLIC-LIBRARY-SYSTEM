@@ -7,3 +7,6 @@ djangorestframework
 pgvector
 requests
 django-cors-headers
+rank_bm25
+nltk
+quixstreams

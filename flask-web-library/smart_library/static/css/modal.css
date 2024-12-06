@@ -1,0 +1,118 @@
+dialog{
+    box-sizing: border-box;
+    width: calc(100% -1em);
+    max-width: 1000px;
+    border: 0.5px solid #ddd;
+    border-radius: 0.5em;
+    padding: 0.8em 1.5em 1em;
+    transition: all 0.3s ease-in-out, transform 0.5s ease-in-out;
+}
+
+
+/* .dialog-content > div:nth-child(2) {
+    height: 1px;
+    background-color: #ccc;
+} */
+
+.dialog-header{
+    display: flex;
+    justify-content: space-between;
+}
+.close{
+    font-family: 'inherit';
+}
+
+.dialog-body{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    grid-template-rows: auto 50px 50px auto 50px 50px;
+    grid-template-areas: 
+    "title title title title title"
+    "image image author author author"
+    "image image tags tags tags"
+    "image image summary summary summary"
+    "image image summary summary summary"
+    "buttonpdf buttonpdf buttonpdf buttonpdf buttonpdf";
+    gap: 16px;
+    padding: 16px; /* Khoảng cách bên trong */
+
+}
+
+.dialog-header > p{
+    font-weight: bold;
+    font-size:40px;
+    margin-top: 10px;
+    margin-left: 10px;
+    margin-bottom: 5px;
+    color: #45b29d;
+}
+
+.dialog-header > span{
+    font-weight: bolder;
+    font-size: 30px;
+    font-family: Arial, sans-serif;
+    align-items: center;
+    margin-top: 10px;
+    color: #555;
+    padding: 5px 10px;
+    border-radius: 50%;
+}
+
+
+#bookImage img {
+    width: 100%; /* Chiếm toàn bộ vùng của grid-area */
+    max-width: 100%; /* Không vượt quá vùng của dialog body */
+    height: auto; /* Giữ tỷ lệ ảnh */
+    max-height: 80%; /* Giới hạn chiều cao tối đa trong vùng dialog body */
+    border-radius: 8px; /* Bo góc nhẹ */
+    object-fit: contain; /
+}
+
+#bookImage{
+    grid-area: image;
+}
+#bookTitle{
+    grid-area: title;
+    font-size: 25px;
+    color:rgb(0, 0, 0);
+    font-weight: bold;
+    max-height: 20%;
+}
+#bookAuthor{
+    grid-area: author;
+    color: #790303;
+    font-weight: 600;
+    font-size: 20px;
+    max-height: 50px;
+}
+#bookSummary{
+    grid-area: summary;
+    color: #5a5a5a;
+    overflow-y: auto;
+    max-height: calc(13 * 1.5em);
+    padding-right: 10px;
+}
+#bookTags{
+    grid-area: tags;
+}
+
+#viewBookPDF{
+    display: flex;
+    grid-area: buttonpdf;
+    background-color: #45b29d;
+    height: auto;
+    max-height: 40px;
+    width: 100px;
+    border-radius: 5px;
+    padding: 10px;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    align-self: center;
+}
+#viewBookPDF a{
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 1px;
+}

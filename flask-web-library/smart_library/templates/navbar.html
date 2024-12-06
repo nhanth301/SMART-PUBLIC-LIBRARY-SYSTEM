@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'index' %}">Calibre-Web</a>
+        <div class="collapse navbar-collapse">
+            <div class="navbar-search">
+                <form class="d-flex search-container align-items-center" method="GET" action="/search/">
+                    <!-- Ô tìm kiếm -->
+                    <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search" name="query">
+                    <button class="btn btn-outline-success" type="submit">Search</button>
+            
+                    <!-- Advanced Search -->
+                    <div class="dropdown ms-3">
+                        <button 
+                            class="btn btn-outline-primary dropdown-toggle" 
+                            type="button" 
+                            id="advanced-search-toggle" 
+                            data-bs-toggle="dropdown" 
+                            aria-expanded="false">
+                            Advanced Search
+                        </button>
+            
+                        <ul class="dropdown-menu" aria-labelledby="advanced-search-toggle">
+                            <li>
+                                <label class="dropdown-item">
+                                    <input type="radio" name="search_type" value="title" class="me-2" checked>
+                                    Search theo tên sách
+                                </label>
+                            </li>
+                            <li>
+                                <label class="dropdown-item">
+                                    <input type="radio" name="search_type" value="content" class="me-2">
+                                    Search theo nội dung (Vector Similarity)
+                                </label>
+                            </li>
+                            <li>
+                                <label class="dropdown-item">
+                                    <input type="radio" name="search_type" value="tags" class="me-2">
+                                    Search theo thể loại
+                                </label>
+                            </li>
+                            <li>
+                                <label class="dropdown-item">
+                                    <input type="radio" name="search_type" value="author" class="me-2">
+                                    Search theo tác giả
+                                </label>
+                            </li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="navbar-navigation">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page"  href="{% url 'index' %}">Home</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if request.user.is_authenticated %}
+                            {{ request.user.username }}
+                            {% else %}
+                                Account
+                            {% endif %}
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                        {% if request.user.is_authenticated %}
+                        <li><a class="dropdown-item" href="#">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href= {% url "logout" %}> Logout </a> </li>
+                        {% else %}
+                        <li><a class="dropdown-item" href= {% url "login" %}> Login </a> </li>
+                        {% endif %}
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        </div>
+    </nav>
+
+</body>
+</html>

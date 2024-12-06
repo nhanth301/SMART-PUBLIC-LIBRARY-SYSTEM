@@ -3,95 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Library</title>
+    <title>{% block title %}Book Library{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     {% load static %}
+    <link rel="icon" type="image/png" href="{% static "/spkt.ico" %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+    <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
 </head>
 <body>
-    <!-- Navbar -->
-    <div class="navbar navbar-static-top">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <a class="navbar-brand" href="#">Trang Chủ</a>
-            </div>
-            <form class="navbar-form">
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Tìm kiếm..." name="search">
-                    <span class="input-group-btn">
-                        <button type="submit" class="btn btn-primary">
-                            {% comment %} <i class="bi bi-search"></i> <!-- Biểu tượng tìm kiếm --> {% endcomment %}
-                            Tìm
-                        </button>
-                    </span>
-                </div>
-            </form>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li>
-                        <a class="advanced-search">Advanced Search</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="account-nav">
-                        <a class="nav-link" href="#">User</a>
-                    </li>
-                    <li class="cart-nav">
-                        <a class="nav-link" href="#">Cart</a>
-                    </li>
-                    <li class="logout-nav">
-                        <a class="nav-link" href="#">Exit</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
+    {% include 'navbar.html' %}
 
     <!-- Container Fluid -->
-    <div class="container-fluid">
+    <div class="container-fluid" id="main-content">
         <div class="row">
             <div class="col-sm-2">
-                <nav class="navigation">
-                    <ul class="book-nav">
-                        <li>
-                            <a href="#books">Books</a>
-                        </li>
-                        <li>
-                            <a href="#hot-books">Hot Books</a>
-                        </li>
-                        <li>
-                            <a href="#top-rated">Top Rated Books</a>
-                        </li>
-                        <li>
-                            <a href="#read-books">Read Books</a>
-                        </li>
-                        <li>
-                            <a href="#unread-books">Unread Books</a>
-                        </li>
-                        <li>
-                            <a href="#discover">Discover</a>
-                        </li>
-                        <li>
-                            <a href="#categories">Categories</a>
-                        </li>
-                        <li>
-                            <a href="#authors">Authors</a>
-                        </li>
-                    </ul>
-                </nav>
+                <div class = "nav-container">
+                    <nav class="navigation">
+                        <ul class="book-nav">
+                            {% for item in menu_items %}
+                            <li>
+                                <div class="nav-item">
+                                    <a href="{{ item.href }}">{{ item.name }}</a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </nav>
+                </div>
             </div>
-             <!-- Nội dung chính bên phải -->
+             
             <div class="col-sm-10">
-                <div class="recommend-books">
-                    <h2> Recommend </h2>
-                </div>
-                <div class="discover-books load-more">
-                    <h2> Discover More Books </h2>
-                </div>
+                {% block content %}
+                <!-- Nội dung trang con sẽ được chèn ở đây -->
+                {% endblock %}
             </div>  
         </div>
     </div>
+    <!-- Nút Chatbot luôn xuất hiện bên phải -->
+    <div id="chatbot-panel">
+        <div id="chatbot-header">
+            <h3>Chatbot</h3>
+            <button id="close-chatbot" onclick="closeChatbot()">X</button>
+        </div>
+        <div id="chatbot-body">
+            <div id="chatbot-response">
+                 <!-- Tin nhắn từ người dùng và chatbot sẽ được thêm vào đây -->
+            </div>
+        </div>
+        <div id="chatbot-footer">
+            <textarea id="user-input" placeholder="Nhập câu hỏi của bạn..." oninput="adjustInputHeight(this)"></textarea>
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+    <button id="chatbot-toggle-btn" onclick="openChatbot()">Chat với chúng tôi!</button>
 
+
+    <dialog  id="bookDialog">
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <p> Book Details </p>
+                <span class="close" onclick="closeDialog()">X</span>
+            </div>
+            <hr>
+            <div class="dialog-body">
+                <div id="bookImage">
+                    <img id="bookImageDialog" src="" alt="Book Image"/>
+                </div>
+                <div id="bookTitle">
+                    <h2></h2>
+                </div>
+                <div id="bookAuthor">
+                    <p></p>
+                </div>
+                <div id="bookSummary">
+                    <p></p>
+                </div>
+                <div id="bookTags">
+                    <p></p>
+                </div>
+                <div id="viewBookPDF">
+                    <a id="viewPDFLink" href="" target="_blank">View PDF</a>
+                </div>
+            </div>
+        </div>
+    </dialog>
+    <script src="{% static 'js/modal.js' %}"></script>
+    <script src="{% static 'js/chatbot.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function skipBook(bookId) {
+            // Lấy phần tử grid chứa sách theo ID
+            const bookElement = document.getElementById('book-' + bookId);
+        
+            // Kiểm tra xem phần tử có tồn tại không
+            if (bookElement) {
+                // Xóa phần tử khỏi DOM
+                bookElement.remove();
+            }
+            handleClick(bookId, 'skip')
+        }        
+
+        function handleClick(bookId, action) {
+            fetch('/api/handle_click/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    book_id: bookId,  
+                    action: action    
+                })
+            })
+            .then(response => response.json())  
+            .then(data => {
+                console.log('Server response:', data);  
+            })
+            .catch(error => {
+                console.error('Error sending data to Python:', error);  
+            });
+        }        
+    </script>
+
 </body>
 </html>

@@ -1,29 +1,255 @@
 
 
-a.navbar-brand{
-    padding: 15px;
+@font-face {
+    font-family: 'Grand Hotel';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/GrandHotel-Regular') format('truetype'), /* Đường dẫn tới file font */
 }
 
-input.form-control{
-    padding: 5 10 5 10;
+body{
+    font-size: 15px;
+    background-color: #f2f2f2 !important
+}
+/* Thanh navbar*/
+
+.navbar{
+    margin: 0;
+    margin-bottom: 25px;
+    padding: 0;
+    width: 100%;
+    height: 50px;
+}
+.navbar-search{
+    display: flex;
+    align-items: center;
 }
 
-.btn{
-    padding: 5 10 5 10;
+.navbar-brand{
+    font-family: 'Grand Hotel', cursive !important;
+    font-size: 35px !important;
+    color: #45b29d !important;
 }
 
-.navbar-collapse a{
-    padding:15px;
+.collapse{
+    justify-content: space-between;
+    margin-left: 100px;
+}
+
+.nav-link{
+    color: #777 !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+}
+
+.navbar-navigation {
+    margin-right: 20px;
+}
+
+/* Thanh search trong navbar */
+#dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+  }
+  .dropdown:hover #dropdown-content {
+    display: block;
+  }
+  .dropdown label {
+    display: block;
+    margin: 5px 0;
+  }
+  
+
+
+/* Nội dung trang web*/
+
+/* Nav Container*/
+
+.nav-container{
+    border-radius: 5px;
+    background-color: #45b29d;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 
+    0 8px 16px rgba(0, 0, 0, 0.05);
+    padding: 0px;
+}
+
+.book-nav{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    gap: 15px
+}
+
+.book-nav a {
+    text-decoration: none; 
+    font-size: 16px; 
+    transition: color 0.3s ease, transform 0.3s ease; 
+}
+
+.book-nav > li > .nav-item{
+    background-color: white; /* Nền trắng */
+    border-radius: 3px;
+    padding: 5px 2px;
+    margin-top: 5px;
+    display: inline-block; /* Để thẻ div hiển thị như inline */
+    width: 100%;
+    transition: color 0.3s ease, background-color 0.3s ease; /* Hiệu ứng chuyển đổi màu */
+}
+.nav-item a{
+    color: #45b29d !important; 
+    width: 100%;
+    display: block;
+    font-weight: 500;
+    margin-left: 2%;
+}
+
+.book-nav > li > .nav-item:hover {
+
+    background-color: #f5f5f5; /* Thay đổi nhẹ nền khi hover */
+}
+.nav-item a:hover{
+    color: red !important; 
+}
+
+/* Grid */
+.books-container{
+    padding: 10px;
+}
+
+.gridItem {
+    min-height: 50px;
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+/* .gridItem:hover {
+    background-color: #d6d6d6;
+} */
+.item{
+    height: 100%;
+    font-weight: bold;
+    width: 100%;
+}
+
+.gridContainer {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(6, minmax(200px, 1fr));
+    clear: both;
+    gap: 30px;
+}
+
+.book-image {
+    max-width: 100%; 
+    height: 100%;
+    object-fit: contain;
+}
+
+.image-container {
+    min-width: 200px; /* Chiều rộng cố định của ảnh */
+    min-height: 250px; /* Chiều cao cố định của ảnh */
+    width: 100%; /* Chiều rộng cố định */
+    height: 70%; /* Chiều cao cố định */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff; /* Viền trắng cho ảnh nhỏ */
+    margin: 16px auto; /* Căn giữa và tạo khoảng cách dưới */
+    margin-top: 2%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 
+    0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+.image-container:hover {
+    transform: scale(1.1); /* Phóng to 10% khi hover */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1), 
+                0 16px 32px rgba(0, 0, 0, 0.1); /* Thêm hiệu ứng đổ bóng khi hover */
+}
+
+.image-container:hover::before {
+    content: ''; /* Tạo một lớp phủ */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5); /* Màu tối khi hover */
+    z-index: 1; /* Đảm bảo lớp phủ luôn ở trên ảnh */
+}
+
+.image-container .options {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    z-index: 2; /* Đảm bảo các nút xuất hiện trên lớp phủ */
+    text-align: center;
+    flex-direction: column;
+}
+
+.image-container:hover .options {
+    display: flex; /* Hiển thị khi hover */
+}
+
+.image-container .option-btn {
+    background-color: #ff2200;
+    color: white;
+    padding: 8px 16px;
+    margin: 5px 5px;
+    border-radius: 5px;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    transition: background-color 0.3s ease;
+}
+
+.image-container .option-btn:hover {
+    background-color: #0056b3; /* Thay đổi màu khi hover vào nút */
 }
 
 
-.input-group {
-    width: 300px; 
+/* Item Book */
+
+.book-info.title{
+    text-overflow: ellipsis;
+    overflow: hidden;
+    height: auto;
+    opacity: .75;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    max-height: calc(1.2em * 3);
+    line-height: 1.2em;
+    font-size: 20px;
 }
 
-.navbar {
-    display: flex; 
-    align-items: center; 
-    justify-content: normal !important;
+.book-info.author{
+    color: #45b29d;
+    font-size: 17px;
 }
 
+
+.book-info.tags{
+    font-size: 11px;
+}
+.book-info.tags a{
+    text-decoration: none;
+    margin: 2px;
+    margin-bottom: 3px;
+    color:white;
+    border-radius:3px;
+    background-color: #007bff;
+    padding: 4px 8px;
+    display: inline-block;
+}

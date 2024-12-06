@@ -1,0 +1,6 @@
+fastapi[standard]
+pydantic
+torch
+numpy
+redis
+psycopg2-binary

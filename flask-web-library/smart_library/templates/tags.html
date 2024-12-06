@@ -1,0 +1,50 @@
+{% extends "index.html" %}
+
+{% block title %}Thể loại sách{% endblock %}
+
+{% block content %}
+{% comment %} {% if not is_searching %}
+<div class="recommend-books">
+    <h2> Recommend </h2>
+    <div class = "gridContainer">
+    </div>
+</div>
+{% endif %} {% endcomment %}
+
+<div class="discover-books load-more">
+    {% for tag_data in tags %}
+        <h2>{{ tag_data.name }}</h2>
+
+        <div class="books-container">
+            <div class = "gridContainer">
+                {% for book in tag_data.books%}
+                <div class = "gridItem" id="book-{{ book.id }}" onclick="openDialog({{ book.id }})">
+                    <div class = "item">
+                        <div class="image-container">
+                            <img src="{{ book.image }}" alt="Book cover" class="book-image">
+                            <div class="options">
+                                <a class="option-btn" onclick="event.stopPropagation(); openDialog({{ book.id }})">Xem</a>
+                                <a class="option-btn" onclick="event.stopPropagation(); skipBook({{ book.id }})">Bỏ qua</a>
+                            </div>
+                        </div>
+                        <div class = "book-info title" title = "{{book.title}}">{{book.title}}</div>
+                        <div class = "book-info author" title = "{{book.author}}">{{book.author}}</div>
+                        <div class = "book-info tags"  > 
+                            {% if book.tags %}
+                                {% for tag in book.tags %}
+                                <a href="/search?query={{ tag }}&search_type=tags " >
+                                    {{ tag }}
+                                </a>
+                                {% endfor %}
+                            {% else %}
+                                <span>No tags available</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div> 
+{% endblock %}
