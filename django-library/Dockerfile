@@ -1,7 +1,7 @@
 FROM fundingsocietiesdocker/python3.8-slim
 WORKDIR /app
-COPY ./flask-web-library/requirements.txt .
-COPY ./flask-web-library/ .
+COPY ./django-library/requirements.txt .
+COPY ./django-library/ .
 # COPY ../calibre-library/ ./smart_library/media/calibre-library
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt

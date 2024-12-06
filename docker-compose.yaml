@@ -124,9 +124,9 @@ services:
     restart: always
   
   
-  flask-web-library:
+  django-library:
     build: 
-      dockerfile: flask-web-library/Dockerfile
+      dockerfile: django-library/Dockerfile
     ports:
       - 1111:1111
     depends_on:
@@ -134,7 +134,7 @@ services:
       - fast-api
     volumes:
       - ${CALIBRE_LIBRARY_VOLUME}:/app/smart_library/media/calibre-library-image
-      - ./flask-web-library/:/app
+      - ./django-library/:/app
   
   fast-api:
     build: 
