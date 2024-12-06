@@ -1,5 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.models import Connection
+from airflow.utils import db
 from datetime import datetime, timedelta
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 import xml.etree.ElementTree as ET
@@ -71,18 +73,16 @@ def connections_check(**kwargs):
             host=PG_HOST,
             port=PG_PORT)
         print("PostgreSQL connection successful.")
-        from airflow.models import Connection
-        from airflow.utils import db
-
+        
         db.merge_conn(
             Connection(
-                conn_id="postgres_default",  
+                conn_id="my_postgres",  
                 conn_type="postgres",        
-                host="postgres-ct",  
-                schema="psql",      
-                login="admin",      
-                password="admin",    
-                port=5432                   
+                host=PG_HOST,  
+                schema=PG_DB,      
+                login=PG_USER,      
+                password=PG_PASS,    
+                port=PG_PORT                 
             )
         )
     
@@ -347,6 +347,7 @@ dag = DAG(
 
 # SQL statements for table creation
 create_books_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
     task_id = 'create_books_table',
     sql="""
     DO $$
@@ -378,6 +379,7 @@ create_books_table = PostgresOperator(
 )
 
 create_tags_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
     task_id = 'create_tags_table',
     sql="""
     DO $$
@@ -400,6 +402,7 @@ create_tags_table = PostgresOperator(
 )
 
 create_books_tags_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
     task_id = 'create_books_tags_table',
     sql="""
         CREATE TABLE IF NOT EXISTS public.books_tags
@@ -416,6 +419,7 @@ create_books_tags_table = PostgresOperator(
 
 
 create_ui_history_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
     task_id='create_ui_history_table',
     sql="""
         CREATE TABLE IF NOT EXISTS public.ui_history
@@ -433,6 +437,7 @@ create_ui_history_table = PostgresOperator(
 )
 
 create_rec_history_table = PostgresOperator(
+    postgres_conn_id = 'my_postgres',
     task_id='create_rec_history_table',
     sql="""
         CREATE TABLE IF NOT EXISTS public.rec_history
