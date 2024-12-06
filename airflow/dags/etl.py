@@ -71,6 +71,20 @@ def connections_check(**kwargs):
             host=PG_HOST,
             port=PG_PORT)
         print("PostgreSQL connection successful.")
+        from airflow.models import Connection
+        from airflow.utils import db
+
+        db.merge_conn(
+            Connection(
+                conn_id="postgres_default",  
+                conn_type="postgres",        
+                host="postgres-ct",  
+                schema="psql",      
+                login="admin",      
+                password="admin",    
+                port=5432                   
+            )
+        )
     
     except sqlite3.Error as e:
         print(f"SQLite error: {e}")
