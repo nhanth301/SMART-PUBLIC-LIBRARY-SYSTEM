@@ -40,9 +40,11 @@ def train_reinforce(states, reward_states, actions, rewards, embedding_dim, acti
         agent.load_model_from_dict(pretrained_weights, pretrained_optim)
 
     num_epochs = epochs
+    losses = []
     for epoch in range(num_epochs):
         loss = agent.update(states, reward_states, actions, rewards)
+        losses.append(loss)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
-    return agent
+    return agent, losses
 
 

@@ -161,19 +161,21 @@ def train_model(**kwargs):
             return tuple(convert_tensors_to_lists(item) for item in d)
         else:
             return d
-    new_weights, new_optim = train(ui_history,embeddings,5,10,pretrained_weights, pretrained_optim)
+    new_weights, new_optim, losses = train(ui_history,embeddings,5,10,pretrained_weights, pretrained_optim)
     weights_serialized = {k: v.tolist() for k, v in new_weights.items()}
     optim_serialized = convert_tensors_to_lists(new_optim)
     ti.xcom_push(key='weights', value=weights_serialized)
     ti.xcom_push(key='optim', value=optim_serialized)
     ti.xcom_push(key='metadata', value={"embedding_dim" : len(embeddings[0]), "action_dim" : len(embeddings)})
-    return weights_serialized, optim_serialized
+    ti.xcom_push(key='losses', value=losses)
+    return weights_serialized, optim_serialized, losses
 
 def save_model(**kwargs):
     ti = kwargs['ti']
     new_weights = ti.xcom_pull(task_ids='train_model', key='weights')
     new_optim = ti.xcom_pull(task_ids='train_model', key='optim')
     metadata = ti.xcom_pull(task_ids='train_model', key='metadata')
+    losses = ti.xcom_pull(task_ids='train_model', key='losses')
     if not new_weights and not new_optim:
         print("No new weights to save.")
         return
@@ -209,6 +211,12 @@ def save_model(**kwargs):
                 VALUES ('metadata', %s, DEFAULT);
             """
             cursor.execute(query3, [Json(metadata)])
+
+            query4 = """
+                INSERT INTO public.model (type, weights, timestamp)
+                VALUES ('losses', %s, DEFAULT);
+            """
+            cursor.execute(query4, [Json(losses)])
             # Commit once after both inserts
             pg_conn.commit()
 

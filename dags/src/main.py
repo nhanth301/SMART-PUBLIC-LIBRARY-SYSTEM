@@ -18,5 +18,5 @@ def train(ui_history, embeddings, window_size=5, epochs=100, pretrained_weights=
     embedding_dim = len(embeddings[0])
     action_dim = len(embeddings) 
     states, reward_states, actions, rewards = create_batch(ui_history,embeddings,window_size)
-    agent = train_reinforce(states, reward_states, actions, rewards, embedding_dim, action_dim, epochs, pretrained_weights, pretrained_optim)
-    return agent.policy.state_dict(), agent.optimizer.state_dict()
+    agent, losses = train_reinforce(states, reward_states, actions, rewards, embedding_dim, action_dim, epochs, pretrained_weights, pretrained_optim)
+    return agent.policy.state_dict(), agent.optimizer.state_dict(), losses

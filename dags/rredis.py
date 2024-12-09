@@ -26,6 +26,9 @@ def read_data(**kwargs):
         redis_client.delete("ui_history")
         retrieved_rec_data = [json.loads(item) for item in redis_client.lrange("rec_history", 0, -1)]
         redis_client.delete("rec_history")
+        ti = kwargs['ti']
+        ti.xcom_push(key='ui', value=retrieved_ui_data)
+        ti.xcom_push(key='rec', value=retrieved_rec_data)
         return retrieved_ui_data, retrieved_rec_data
     except redis.ConnectionError:
         print("Không thể kết nối đến Redis.")
@@ -42,7 +45,7 @@ def store_data(**kwargs):
         print("PostgreSQL connection successful.")
         pg_cursor = pg_conn.cursor()
         ti = kwargs['ti']
-        ui_data, rec_data = ti.xcom_pull(task_ids='read_data')
+        ui_data, rec_data = ti.xcom_pull(task_ids='read_data',key='ui'), ti.xcom_pull(task_ids='read_data',key='rec')
 
         query = """
                 INSERT INTO public.ui_history (sid, uid, bid, action, timestamp)

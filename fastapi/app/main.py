@@ -96,8 +96,9 @@ try:
     """
     cursor.execute(query)
     adapter = LinearAdapter(768,128)
-    adapter_w = {k: torch.tensor(np.array(v)) for k, v in adapter_w.items()}
-    adapter.load_state_dict(adapter_w)
+    if adapter_w:
+        adapter_w = {k: torch.tensor(np.array(v)) for k, v in adapter_w.items()}
+        adapter.load_state_dict(adapter_w)
     embeddings = [adapter(torch.tensor(ast.literal_eval(row[0]))).detach() for row in cursor.fetchall()]
     print("Load embedding successfully")
     cursor.close()          

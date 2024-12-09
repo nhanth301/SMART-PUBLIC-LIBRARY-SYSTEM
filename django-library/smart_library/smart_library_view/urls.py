@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BooksListView, index, BooksAPIView, BookDetailView, navbar, search, tags, tags_view, handle_click
+from .views import BooksListView, index, BooksAPIView, BookDetailView, navbar, search, tags, tags_view, handle_click, visualize
 from .views import register, loginUser, logoutUser
 from .chatbot_logic import get_book_suggestions
 
@@ -17,5 +17,6 @@ urlpatterns = [
     path('logout', logoutUser, name ="logout"),
     path('tags', tags, name ="tags"),
     path('api/tags', tags_view, name='tags_view'),
-    path('api/handle_click/', handle_click, name='handle_click')
+    path('api/handle_click/', handle_click, name='handle_click'),
+    path('visualize', visualize, name='visualize')
 ]

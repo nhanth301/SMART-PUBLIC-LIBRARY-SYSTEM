@@ -479,6 +479,26 @@ create_model_table = PostgresOperator(
     dag=dag
 )
 
+# create_training_history_table = PostgresOperator(
+#     postgres_conn_id = 'my_postgres',
+#     task_id = 'create_training_history_table',
+#     sql = """
+#         CREATE TABLE IF NOT EXISTS public.training_history
+#         (
+#             id SERIAL NOT NULL,
+#             type character varying NOT NULL,
+#             weights JSON NOT NULL,
+#             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#             CONSTRAINT model_pkey PRIMARY KEY (id)
+#         )
+#         TABLESPACE pg_default;
+
+#         ALTER TABLE IF EXISTS public.model OWNER TO admin;
+#     """,
+#     dag=dag
+# )
+
+
 create_warehouse = PostgresOperator(
     postgres_conn_id = 'my_postgres',
     task_id = 'create_warehouse',
@@ -503,17 +523,16 @@ CREATE TABLE IF NOT EXISTS DIM_Action (
 
 CREATE TABLE IF NOT EXISTS Fact_Recommendation (
     factID SERIAL PRIMARY KEY,
-    sessionID INT NOT NULL,
+    sessionID character varying NOT NULL,
     userID INT NOT NULL,
     bookID INT NOT NULL,
-    actionID INT NOT NULL REFERENCES DIM_Action(actionID),
     timeID INT NOT NULL REFERENCES DIM_Time(timeID),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS Fact_User_Interaction (
     factID SERIAL PRIMARY KEY,
-    sessionID INT NOT NULL,
+    sessionID character varying NOT NULL,
     userID INT NOT NULL,
     bookID INT NOT NULL,
     actionID INT NOT NULL REFERENCES DIM_Action(actionID),
@@ -529,13 +548,6 @@ BEGIN
         AND indexname = 'idx_fact_recommendation_timeid'
     ) THEN
         CREATE INDEX idx_fact_recommendation_timeid ON Fact_Recommendation(timeID);
-    END IF;
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE tablename = 'fact_recommendation' 
-        AND indexname = 'idx_fact_recommendation_actionid'
-    ) THEN
-        CREATE INDEX idx_fact_recommendation_actionid ON Fact_Recommendation(actionID);
     END IF;
 END $$;
 
@@ -614,18 +626,57 @@ END $$;
         $$ LANGUAGE plpgsql;
 
         -- Function to get actionID from action name
-        CREATE OR REPLACE FUNCTION get_action_id(action_name VARCHAR) 
-        RETURNS INT AS $$
-        DECLARE
-            action_id INT;
-        BEGIN
-            SELECT actionID INTO action_id
-            FROM DIM_Action
-            WHERE actionName = action_name;
-            
-            RETURN action_id;
-        END;
-        $$ LANGUAGE plpgsql;
+            CREATE OR REPLACE FUNCTION get_action_id(action_name VARCHAR) 
+            RETURNS INT AS $$
+            DECLARE
+                action_id INT;
+            BEGIN
+                SELECT actionID INTO action_id
+                FROM DIM_Action
+                WHERE actionName = action_name;
+                
+                RETURN action_id;
+            END;
+            $$ LANGUAGE plpgsql;
+            CREATE OR REPLACE VIEW vw_recommendation_rate_by_action AS
+                SELECT 
+                    dt.date AS recommendation_date,
+                    da.actionname AS action_type,
+                    COUNT(CASE WHEN da.actionname = 'skip' THEN fui.bookid END) AS total_skipped,
+                    COUNT(CASE WHEN da.actionname = 'click' THEN fui.bookid END) AS total_clicked,
+                    COUNT(CASE WHEN da.actionname = 'read' THEN fui.bookid END) AS total_read,
+                    COUNT(CASE WHEN fui.factid IS NULL THEN fr.bookid END) AS total_no_interaction,
+                    COUNT(DISTINCT fr.bookid) AS total_recommended_books,
+                    COUNT(*) AS total_recommendations -- Tổng số khuyến nghị
+                FROM 
+                    fact_recommendation fr
+                LEFT JOIN 
+                    fact_user_interaction fui 
+                    ON fr.userid = fui.userid AND fr.bookid = fui.bookid AND fr.timeid = fui.timeid
+                LEFT JOIN 
+                    dim_action da 
+                    ON fui.actionid = da.actionid
+                JOIN 
+                    dim_time dt 
+                    ON fr.timeid = dt.timeid
+                GROUP BY 
+                    dt.date, da.actionname
+                ORDER BY 
+                    dt.date, action_type;
+
+                CREATE OR REPLACE VIEW vw_user_interaction_analysis AS
+                    SELECT 
+                        dt.year,
+                        dt.quarter,
+                        dt.month,
+                        da.actionName,
+                        COUNT(*) as action_count,
+                        COUNT(DISTINCT ui.userID) as unique_users,
+                        COUNT(DISTINCT ui.bookID) as unique_books
+                    FROM Fact_User_Interaction ui
+                    JOIN DIM_Time dt ON ui.timeID = dt.timeID
+                    JOIN DIM_Action da ON ui.actionID = da.actionID
+                    GROUP BY dt.year, dt.quarter, dt.month, da.actionName;
         ALTER TABLE public.DIM_Time OWNER to admin;
         ALTER TABLE public.DIM_Action OWNER to admin;
         ALTER TABLE public.Fact_Recommendation OWNER to admin;

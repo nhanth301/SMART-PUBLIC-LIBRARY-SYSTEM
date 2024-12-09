@@ -290,4 +290,175 @@ def handle_click(request):
     else:
         return JsonResponse({'error': 'Invalid request method'}, status=400)
 
+import pandas as pd
+import psycopg2
+import seaborn as sns
+import matplotlib.pyplot as plt
+import io
+from django.http import HttpResponse
 
+# Make sure these imports are at the top of your file
+import base64  # Add this import
+from django.shortcuts import render
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import psycopg2
+import io
+
+def visualize(request):
+    try:
+        # Database connection with context manager
+        with psycopg2.connect(
+            dbname="spls",
+            user="admin",
+            password="admin",
+            host="postgres-ct",
+            port="5432"
+        ) as conn:
+            images = []
+            
+            # First visualization
+            query1 = """
+            SELECT 
+                recommendation_date, 
+                action_type, 
+                total_skipped, 
+                total_clicked, 
+                total_read, 
+                total_no_interaction, 
+                total_recommended_books, 
+                total_recommendations
+            FROM vw_recommendation_rate_by_action
+            """
+            data1 = pd.read_sql_query(query1, conn)
+            data1['recommendation_date'] = pd.to_datetime(data1['recommendation_date'])
+
+            plt.figure(figsize=(14, 8))
+            sns.barplot(
+                data=data1, 
+                x="recommendation_date", 
+                y="total_recommended_books", 
+                hue="action_type"
+            )
+            plt.title("User Actions on Recommended Books by Date", fontsize=16)
+            plt.xlabel("Recommendation Date", fontsize=14)
+            plt.ylabel("Total Recommended Books", fontsize=14)
+            plt.legend(title="Action Type", loc="upper right")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            plt.close()
+            buffer.seek(0)
+            image1 = base64.b64encode(buffer.getvalue()).decode()
+            images.append(image1)
+
+            # Second visualization
+            query2 = """
+            SELECT 
+                year, 
+                quarter, 
+                month, 
+                actionname, 
+                action_count, 
+                unique_users, 
+                unique_books
+            FROM vw_user_interaction_analysis
+            """
+            data2 = pd.read_sql_query(query2, conn)
+            
+            data2['month_label'] = data2['year'].astype(str) + "-" + data2['month'].astype(str).str.zfill(2)
+            data2['action_per_user'] = data2['action_count'] / data2['unique_users']
+
+            plt.figure(figsize=(14, 8))
+            sns.lineplot(
+                data=data2,
+                x="month_label",
+                y="action_per_user",
+                hue="actionname",
+                marker="o"
+            )
+            plt.title("Action per User Over Time by Action Type", fontsize=16)
+            plt.xlabel("Month", fontsize=14)
+            plt.ylabel("Actions per User", fontsize=14)
+            plt.legend(title="Action Type", loc="upper right")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            plt.close()
+            buffer.seek(0)
+            image2 = base64.b64encode(buffer.getvalue()).decode()
+            images.append(image2)
+
+            query3 = """
+            SELECT weights, timestamp FROM model where type = 'losses' ORDER BY timestamp DESC LIMIT 3;
+            """
+            data = pd.read_sql_query(query3, conn)
+            loss_data = []
+            timestamps = []
+
+            for row in data.itertuples():
+                loss_values = row.weights  
+                loss_data.append(loss_values)
+                timestamps.append(row.timestamp)
+
+            # Tạo biểu đồ
+            plt.figure(figsize=(10, 6))
+            for idx, loss_values in enumerate(loss_data):
+                plt.plot(loss_values, label=f"Training {idx + 1} - {timestamps[idx]}")
+
+            plt.title("Loss Values Over 3 Most Recent Training RecSys Rounds")
+            plt.xlabel("Epochs")
+            plt.ylabel("Loss")
+            plt.legend(title="Training Rounds")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            plt.close()
+            buffer.seek(0)
+            image3 = base64.b64encode(buffer.getvalue()).decode()
+            images.append(image3)
+            
+            query4 = """
+            SELECT weights, timestamp FROM model where type = 'adapter_losses' ORDER BY timestamp DESC LIMIT 3;
+            """
+            data = pd.read_sql_query(query4, conn)
+            loss_data = []
+            timestamps = []
+
+            for row in data.itertuples():
+                loss_values = row.weights 
+                loss_data.append(loss_values)
+                timestamps.append(row.timestamp)
+
+            # Tạo biểu đồ
+            plt.figure(figsize=(10, 6))
+            for idx, loss_values in enumerate(loss_data):
+                plt.plot(loss_values, label=f"Training {idx + 1} - {timestamps[idx]}")
+
+            plt.title("Loss Values Most Recent Training Linear Adapter Rounds")
+            plt.xlabel("Epochs")
+            plt.ylabel("Loss")
+            plt.legend(title="Training Rounds")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            plt.close()
+            buffer.seek(0)
+            image4 = base64.b64encode(buffer.getvalue()).decode()
+            images.append(image4)
+
+        return render(request, 'multiple_charts.html', {'images': images})
+        
+    except Exception as e:
+        # Log the error and return an error page
+        print(f"Error occurred: {str(e)}")
+        return render(request, 'error.html', {'error_message': str(e)})

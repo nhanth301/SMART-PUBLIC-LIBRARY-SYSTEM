@@ -80,8 +80,15 @@ def train_adapter(**kwargs):
             'input_dim' : 768,
             'output_dim' : 128
         }
-        adapter, _ = train_linear_adapter(df, **adapter_kwargs)
+        adapter, losses = train_linear_adapter(df, **adapter_kwargs)
         del df 
+        cursor = pg_conn.cursor()
+        query = """
+                INSERT INTO public.model (type, weights, timestamp)
+                VALUES ('adapter_losses', %s, DEFAULT);
+            """
+        cursor.execute(query, [Json(losses)])
+        pg_conn.commit()
         weights = adapter.state_dict()
         weights_serialized = {k: v.tolist() for k, v in weights.items()}
         return weights_serialized

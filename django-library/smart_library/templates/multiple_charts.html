@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Visualizations</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #eaf2f8; /* Màu nền của trang */
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px; /* Tăng max-width container */
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            font-weight: 600;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(to right, #3498db, #2ecc71);
+            border-radius: 2px;
+        }
+
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* Fixed 2 columns */
+            gap: 40px; /* Increased gap */
+            padding: 20px;
+        }
+
+        .chart-container {
+            background: #f0f8ff; /* Màu nền của biểu đồ */
+            border-radius: 15px;
+            padding: 30px; /* Tăng padding */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            min-height: 400px; /* Chiều cao tối thiểu */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+            min-width: 600px; /* Chiều rộng tối thiểu cho ảnh */
+            object-fit: contain;
+        }
+
+        @media (max-width: 1400px) {
+            .visualization-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-container {
+                min-height: 350px;
+            }
+            
+            img {
+                min-width: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 0 10px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .chart-container {
+                padding: 15px;
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Data Visualizations</h1>
+        <div class="visualization-grid">
+            {% for img in images %}
+                <div class="chart-container">
+                    <img src="data:image/png;base64,{{ img|safe }}" alt="Chart">
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

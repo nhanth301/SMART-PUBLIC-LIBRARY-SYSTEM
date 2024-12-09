@@ -50,12 +50,11 @@ dw_ingest_task = PostgresOperator(
     );
 
     -- Migrate recommendation history data
-    INSERT INTO Fact_Recommendation (sessionID, userID, bookID, actionID, timeID, created_at)
+    INSERT INTO Fact_Recommendation (sessionID, userID, bookID, timeID, created_at)
     SELECT 
         rh.sid,
         rh.uid,
         rh.bid,
-        get_action_id(rh.action),
         get_time_id(rh.timestamp),
         to_timestamp(rh.timestamp)
     FROM rec_history rh
