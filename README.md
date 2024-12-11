@@ -47,6 +47,6 @@ Dự án xây dựng một hệ thống thư viện thông minh, cung cấp nề
 ***Chi tiết  hoạt động***
 ![Component 1](images/pipeline55.png)
 Dữ liệu lịch sử tương tác, khuyến nghị của của dùng sẽ được ETL đến kho dữ liệu để phục vụ cho việc phân tích, cụ thể là phân tích độ hiểu quả của mô hình khuyến nghị dựa trên phản hồi của người dùng trên những quyển sách được hệ thống gợi ý.
-![Component 1](images/image.png)
+![Component 1](images/image02.png)
 
 
