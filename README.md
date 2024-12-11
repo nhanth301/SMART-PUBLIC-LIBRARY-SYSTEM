@@ -41,7 +41,7 @@ Dự án xây dựng một hệ thống thư viện thông minh, cung cấp nề
 ![Component 1](images/pipeline44.png)
 - **Pretraining pharase:** Áp dụng Contrastive Learning sử dụng Triplet Loss để học biểu diễn các embedding của các quyển sách tốt hơn, mục tiêu mong muốn các quyển sách có cùng thể loại sẽ gom nhóm lại gần nhau hơn trong latent space, cùng với đó là giảm chiều embedding để mô hình khuyến nghị không bị quá phức tạp.
 ![Component 1](images/ct.png)
-- **Training *RecSys Model**: Mô hình sẽ tự động huấn luyện lại trên dữ liệu mới và một phần dữ liệu cũ, sử dụng lại các trọng số của lần huấn luyện gần nhất. Mô hình áp dụng thuật toán REINFORCE trong học tăng cường, thuộc loại policy gradient để huấn luyện cùng với lớp mã hóa trạng thái người dùng từ lịch sử tương tác gần nhất.
+- **Training RecSys Model**: Mô hình sẽ tự động huấn luyện lại trên dữ liệu mới và một phần dữ liệu cũ, sử dụng lại các trọng số của lần huấn luyện gần nhất. Mô hình áp dụng thuật toán REINFORCE trong học tăng cường, thuộc loại policy gradient để huấn luyện cùng với lớp mã hóa trạng thái người dùng từ lịch sử tương tác gần nhất.
 ### **5.Kho dữ liệu và trực quan hóa**
 ![Component 1](images/pipeline5.png)
 *Chi tiết  hoạt động*
