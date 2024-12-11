@@ -355,12 +355,7 @@ create_books_table = PostgresOperator(
     postgres_conn_id = 'my_postgres',
     task_id = 'create_books_table',
     sql="""
-    DO $$
-    BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
-        CREATE EXTENSION vector;
-    END IF;
-    END $$;
+    CREATE EXTENSION IF NOT EXISTS vector;
     CREATE TABLE IF NOT EXISTS public.books
     (
         idx serial PRIMARY KEY,
@@ -387,12 +382,7 @@ create_tags_table = PostgresOperator(
     postgres_conn_id = 'my_postgres',
     task_id = 'create_tags_table',
     sql="""
-    DO $$
-    BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
-        CREATE EXTENSION vector;
-    END IF;
-    END $$;
+    CREATE EXTENSION IF NOT EXISTS vector;
     CREATE TABLE IF NOT EXISTS public.tags
     (
         id integer NOT NULL,

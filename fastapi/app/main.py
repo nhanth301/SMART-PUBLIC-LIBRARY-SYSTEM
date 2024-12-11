@@ -154,7 +154,7 @@ def process_list(input_list:List[List[Union[str, int]]]):
         value = {"sid" : sid, "uid" : uid, "bid" : id, "timestamp" : int(time.time())}
         redis_client.rpush("rec_history", json.dumps(value))
 
-@app.get("/rec/")
+@app.get("/rec/")   
 def getRec(uid: int):
     recommended_books = redis_client.lrange(str(uid)+'_rec', 0, -1)
     recommended_books = [int(item) for item in recommended_books]
