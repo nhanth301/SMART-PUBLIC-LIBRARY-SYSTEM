@@ -46,5 +46,5 @@ The project aims to build a smart public library system that provides a web plat
 ![Component 1](images/pipeline55.png)
 *The interaction history and recommendation data are processed through ETL pipelines and stored in the data warehouse for analysis. Enables analysis of the recommendation model's effectiveness based on user feedback on suggested books.*
 ![Component 1](images/image02.png)
-
-
+### **6. Demo**
+![Component 1](images/demo.jpeg)
