@@ -41,6 +41,7 @@ The project aims to build a smart public library system that provides a web plat
 - **Pretraining phase:** Utilizes Contrastive Learning with Triplet Loss to improve the representation of book embeddings. The goal is to cluster books of similar genres closer in latent space while reducing the embedding dimension to simplify the recommendation model.
 ![Component 1](images/ct.png)
 - **Training the RecSys Model**: The model retrains automatically on new data along with a subset of old data. It reuses the weights from the latest training iteration. The model employs the REINFORCE reinforcement learning algorithm (a policy gradient method) combined with a user state encoder built from recent interaction history.
+![Component 1](images/pnet.png)
 ### **5.Data Warehouse and Visualization**
 <!-- ![Component 1](images/pipeline5.png) -->
 ![Component 1](images/pipeline55.png)
