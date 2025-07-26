@@ -2,7 +2,7 @@
 ## **Introduction**
 The project aims to build a smart public library system that provides a web platform for users to interact with a book repository. It also integrates a chatbot for book recommendations based on user requests, leveraging the Retrieval-Augmented Generation (RAG) technique. A real-time book recommendation system is developed using user interactions, employing the REINFORCE reinforcement learning algorithm. Additionally, the project includes the development of a data warehouse to evaluate the model's effectiveness through user feedback. All components of the project are containerized using Docker and managed with Docker Compose. The workflow is orchestrated and automated using Apache Airflow, covering tasks such as data transfer, automatic data reading/writing, and periodic model retraining.
 ## **Overview Architecture**
-![Pipeline Architecture](images/FULLF.jpeg)
+![Pipeline Architecture](images/libv2.png)
 **1. Calibre**: Manages and organizes book data.
 
 **2. SQLite**: Database for Calibre.
